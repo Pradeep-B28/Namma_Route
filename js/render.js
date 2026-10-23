@@ -1,16 +1,6 @@
-// SVG Map Renderer for Namma Route
-// Draws schematic metro map on 1000 x 1400 viewBox canvas
-// Handles line strokes, station dots, labels, search ripples, route drawing, and zoom/pan
-
-import { ROAD_LINKS, RAIL_LINKS } from './tn-data.js';
-
-const LINES = {};
-const CONNECTORS = [];
-
-const TERMINAL_STATIONS = new Set([
-  'wimco-nagar-depot', 'chennai-airport', 'chennai-central',
-  'st-thomas-mount', 'chennai-beach', 'velachery'
-]);
+// SVG Map Renderer for Namma Route: Tamil Nadu Transit Network
+// Renders state outline, offset road/rail lines, city dots, tier-based labels,
+// zoom/pan with viewBox, pointer coordinate transformations, and route animations.
 
 export class MapRenderer {
   constructor(containerId, graph, options = {}) {
@@ -18,180 +8,203 @@ export class MapRenderer {
     if (!this.container) throw new Error(`Container #${containerId} not found`);
 
     this.graph = graph;
-    this.onStationSelect = options.onStationSelect || (() => {});
+    this.onCitySelect = options.onCitySelect || (() => {});
+    this.onInvalidSelect = options.onInvalidSelect || (() => {});
+
+    this.travelMode = 'any';
     this.selectedFromId = null;
     this.selectedToId = null;
-    this.activeRoute = null;
+    this.routeCityIds = new Set();
 
-    this.defaultViewBox = { x: 0, y: 0, w: 1000, h: 1400 };
+    this.defaultViewBox = { x: 0, y: 0, w: 1000, h: 1330 };
     this.viewBox = { ...this.defaultViewBox };
+    this.zoomLevel = 1.0;
 
     this.initSvg();
-    this.drawLines();
-    this.drawConnectors();
-    this.drawStations();
-    this.attachEvents();
+    this.drawMapElements();
+    this.setupEvents();
     this.setupZoomPan();
+  }
+
+  createSvgEl(tag, attrs = {}) {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+    return el;
   }
 
   initSvg() {
     this.container.innerHTML = '';
-    this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    this.svg.setAttribute('viewBox', '0 0 1000 1400');
-    this.svg.setAttribute('class', 'metro-map-svg');
-    this.svg.setAttribute('role', 'img');
-    this.svg.setAttribute('aria-label', "Chennai Metro and MRTS Network Map");
+    this.svg = this.createSvgEl('svg', {
+      viewBox: `${this.viewBox.x} ${this.viewBox.y} ${this.viewBox.w} ${this.viewBox.h}`,
+      class: 'tn-map-svg',
+      role: 'img',
+      'aria-label': 'Tamil Nadu Road and Rail Transit Map'
+    });
 
-    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    const defs = this.createSvgEl('defs');
     defs.innerHTML = `
+      <linearGradient id="route-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="var(--route-from)" />
+        <stop offset="100%" stop-color="var(--route-to)" />
+      </linearGradient>
       <filter id="route-glow" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur stdDeviation="6" result="blur" />
+        <feGaussianBlur stdDeviation="5" result="blur" />
         <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
       </filter>
     `;
     this.svg.appendChild(defs);
 
-    this.connectorsLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    this.linesLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    this.searchLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    this.routeLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    this.stationsLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    this.labelsLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-
-    this.svg.append(this.connectorsLayer, this.linesLayer, this.searchLayer, this.routeLayer, this.stationsLayer, this.labelsLayer);
+    // Layers ordered bottom to top: outline, road, rail, search, route, cities, labels, pins
+    this.layers = {
+      outline: this.createSvgEl('g'),
+      road: this.createSvgEl('g'),
+      rail: this.createSvgEl('g'),
+      search: this.createSvgEl('g'),
+      route: this.createSvgEl('g'),
+      cities: this.createSvgEl('g'),
+      labels: this.createSvgEl('g'),
+      pins: this.createSvgEl('g')
+    };
+    Object.values(this.layers).forEach((l) => this.svg.appendChild(l));
     this.container.appendChild(this.svg);
   }
 
-  drawLines() {
-    for (const line of Object.values(LINES)) {
-      const points = line.stations.map(sId => `${this.graph.stations[sId].x},${this.graph.stations[sId].y}`);
-      const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-      polyline.setAttribute('points', points.join(' '));
-      polyline.setAttribute('fill', 'none');
-      polyline.setAttribute('stroke', line.color);
-      polyline.setAttribute('stroke-width', '8');
-      polyline.setAttribute('stroke-linecap', 'round');
-      polyline.setAttribute('stroke-linejoin', 'round');
-      polyline.setAttribute('class', `metro-line line-${line.id}`);
-      this.linesLayer.appendChild(polyline);
-    }
+  getOffset(x1, y1, x2, y2, offset) {
+    if (!offset) return { x1, y1, x2, y2 };
+    const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy);
+    if (!L) return { x1, y1, x2, y2 };
+    const nx = (-dy / L) * offset, ny = (dx / L) * offset;
+    return { x1: x1 + nx, y1: y1 + ny, x2: x2 + nx, y2: y2 + ny };
   }
 
-  drawConnectors() {
-    for (const conn of CONNECTORS) {
-      const s1 = this.graph.stations[conn.from];
-      const s2 = this.graph.stations[conn.to];
-      if (!s1 || !s2) continue;
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', s1.x); line.setAttribute('y1', s1.y);
-      line.setAttribute('x2', s2.x); line.setAttribute('y2', s2.y);
-      line.setAttribute('stroke', '#5B6577');
-      line.setAttribute('stroke-width', '3');
-      line.setAttribute('stroke-dasharray', '6 6');
-      line.setAttribute('stroke-linecap', 'round');
-      this.connectorsLayer.appendChild(line);
-    }
-  }
+  drawMapElements() {
+    // 1. State outline
+    this.layers.outline.appendChild(this.createSvgEl('path', { d: this.graph.outline, class: 'state-outline-path' }));
 
-  drawStations() {
-    this.stationElements = {};
+    // 2. Road links
+    for (const l of this.graph.roadLinks) {
+      const c1 = this.graph.cities[l.a], c2 = this.graph.cities[l.b];
+      if (!c1 || !c2) continue;
+      const { x1, y1, x2, y2 } = this.getOffset(c1.x, c1.y, c2.x, c2.y, l.offset);
+      this.layers.road.appendChild(this.createSvgEl('line', { x1, y1, x2, y2, class: `road-link road-${l.kind}` }));
+    }
+
+    // 3. Rail links (dual-line railway track)
+    for (const l of this.graph.railLinks) {
+      const c1 = this.graph.cities[l.a], c2 = this.graph.cities[l.b];
+      if (!c1 || !c2) continue;
+      const { x1, y1, x2, y2 } = this.getOffset(c1.x, c1.y, c2.x, c2.y, l.offset);
+      this.layers.rail.appendChild(this.createSvgEl('line', { x1, y1, x2, y2, class: `rail-link-base rail-${l.kind}` }));
+      const dash = this.createSvgEl('line', { x1, y1, x2, y2, class: `rail-link-dash rail-${l.kind}` });
+      if (l.kind === 'hill') dash.innerHTML = '<title>Nilgiri Mountain Railway. Very slow.</title>';
+      this.layers.rail.appendChild(dash);
+    }
+
+    // 4. Cities and labels
+    this.cityElements = {};
     this.labelElements = {};
 
-    for (const station of Object.values(this.graph.stations)) {
-      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      g.setAttribute('class', `station-group station-${station.id}`);
-      g.setAttribute('data-id', station.id);
-      g.setAttribute('transform', `translate(${station.x}, ${station.y})`);
-
-      const hitTarget = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      hitTarget.setAttribute('r', '20');
-      hitTarget.setAttribute('fill', 'transparent');
-      g.appendChild(hitTarget);
-
-      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      if (station.isInterchange) {
-        dot.setAttribute('r', '11');
-        dot.setAttribute('fill', '#0B0F17');
-        dot.setAttribute('stroke', '#E8ECF3');
-        dot.setAttribute('stroke-width', '4');
-        dot.setAttribute('class', 'station-dot interchange-ring');
-        const innerDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        innerDot.setAttribute('r', '4');
-        innerDot.setAttribute('fill', '#E8ECF3');
-        g.appendChild(innerDot);
-      } else {
-        dot.setAttribute('r', '6');
-        dot.setAttribute('fill', '#0B0F17');
-        dot.setAttribute('stroke', '#E8ECF3');
-        dot.setAttribute('stroke-width', '2.5');
-        dot.setAttribute('class', 'station-dot normal-dot');
-      }
+    for (const city of Object.values(this.graph.cities)) {
+      const g = this.createSvgEl('g', {
+        class: `city-group city-${city.id} tier-${city.tier} ${city.hq ? 'is-hq' : 'is-town'}`,
+        'data-id': city.id,
+        transform: `translate(${city.x}, ${city.y})`
+      });
+      const dot = this.createSvgEl('circle', { r: city.tier === 1 ? 9 : 6.5, class: city.hq ? 'city-dot hq-dot' : 'city-dot town-dot' });
       g.appendChild(dot);
-      this.stationsLayer.appendChild(g);
-      this.stationElements[station.id] = g;
+      this.layers.cities.appendChild(g);
+      this.cityElements[city.id] = g;
 
-      const isAlwaysVisible = station.isInterchange || TERMINAL_STATIONS.has(station.id);
-      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      label.setAttribute('x', station.x + (station.x > 700 ? -14 : 14));
-      label.setAttribute('y', station.y + 4);
-      label.setAttribute('text-anchor', station.x > 700 ? 'end' : 'start');
-      label.setAttribute('class', `station-label ${isAlwaysVisible ? 'label-always' : 'label-optional'}`);
-      label.textContent = station.name;
-      this.labelsLayer.appendChild(label);
-      this.labelElements[station.id] = label;
+      const lbl = city.label || { dx: 12, dy: 6, anchor: 'start' };
+      const label = this.createSvgEl('text', {
+        x: city.x + lbl.dx,
+        y: city.y + lbl.dy,
+        'text-anchor': lbl.anchor || 'start',
+        class: `city-label tier-${city.tier}`,
+        'data-tier': city.tier
+      });
+      label.textContent = city.name;
+      this.layers.labels.appendChild(label);
+      this.labelElements[city.id] = label;
     }
+
+    this.updateLabelVisibility();
   }
 
-  attachEvents() {
+  setupEvents() {
     this.svg.addEventListener('click', (e) => {
       if (this.wasPanning) { this.wasPanning = false; return; }
-      const group = e.target.closest('.station-group');
-      if (group) {
-        this.onStationSelect(group.getAttribute('data-id'));
-        return;
+      const group = e.target.closest('.city-group');
+      if (group) { this.handleCityClick(group.getAttribute('data-id')); return; }
+
+      const ctm = this.svg.getScreenCTM();
+      if (!ctm) return;
+      const svgPoint = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
+      const maxDist = 22 * (this.viewBox.w / (this.svg.clientWidth || 1000));
+      let nearestId = null, minDist = maxDist;
+
+      for (const c of Object.values(this.graph.cities)) {
+        const d = Math.hypot(c.x - svgPoint.x, c.y - svgPoint.y);
+        if (d < minDist) { minDist = d; nearestId = c.id; }
       }
-      const pt = this.svg.createSVGPoint();
-      pt.x = e.clientX; pt.y = e.clientY;
-      const svgPoint = pt.matrixTransform(this.svg.getScreenCTM().inverse());
-      let nearestId = null;
-      let minDist = 35;
-      for (const s of Object.values(this.graph.stations)) {
-        const d = Math.hypot(s.x - svgPoint.x, s.y - svgPoint.y);
-        if (d < minDist) { minDist = d; nearestId = s.id; }
-      }
-      if (nearestId) this.onStationSelect(nearestId);
+      if (nearestId) this.handleCityClick(nearestId);
     });
 
+    this.hoverCard = document.getElementById('city-hover-card');
     this.svg.addEventListener('mousemove', (e) => {
-      const group = e.target.closest('.station-group');
-      if (group) this.showLabel(group.getAttribute('data-id'), true);
+      const group = e.target.closest('.city-group');
+      if (group && this.hoverCard) {
+        const city = this.graph.cities[group.getAttribute('data-id')];
+        if (city) {
+          const stationInfo = city.rail ? `Railway station: ${city.station || city.name}` : 'No railway station';
+          const distInfo = city.district ? `<div class="hover-district">${city.district} District</div>` : '';
+          this.hoverCard.innerHTML = `<div class="hover-title">${city.name}</div>${distInfo}<div class="hover-rail ${city.rail ? 'has-station' : 'no-station'}">${stationInfo}</div>`;
+          this.hoverCard.style.left = `${e.clientX + 14}px`;
+          this.hoverCard.style.top = `${e.clientY + 14}px`;
+          this.hoverCard.classList.remove('hidden');
+          this.labelElements[city.id]?.classList.add('label-hover');
+        }
+      } else if (this.hoverCard) {
+        this.hoverCard.classList.add('hidden');
+        document.querySelectorAll('.label-hover').forEach((l) => l.classList.remove('label-hover'));
+      }
     });
-    this.svg.addEventListener('mouseleave', () => this.updateLabelVisibility());
+
+    this.svg.addEventListener('mouseleave', () => {
+      if (this.hoverCard) this.hoverCard.classList.add('hidden');
+      document.querySelectorAll('.label-hover').forEach((l) => l.classList.remove('label-hover'));
+    });
   }
 
-  // Zoom & Pan support
+  handleCityClick(cityId) {
+    const city = this.graph.cities[cityId];
+    if (!city) return;
+    const isTrain = this.travelMode === 'train' || this.travelMode === 'rail';
+    if (isTrain && !city.rail) {
+      const g = this.cityElements[cityId];
+      if (g) { g.classList.add('shake-anim'); setTimeout(() => g.classList.remove('shake-anim'), 350); }
+      this.onInvalidSelect(city);
+      return;
+    }
+    this.onCitySelect(cityId);
+  }
+
   setupZoomPan() {
-    let isDragging = false;
-    let startX = 0; let startY = 0;
+    let isDragging = false, startX = 0, startY = 0;
     this.wasPanning = false;
 
     this.svg.addEventListener('mousedown', (e) => {
-      if (e.target.closest('.station-hit-area')) return;
-      isDragging = true;
-      this.wasPanning = false;
-      startX = e.clientX;
-      startY = e.clientY;
+      isDragging = true; this.wasPanning = false;
+      startX = e.clientX; startY = e.clientY;
     });
 
     window.addEventListener('mousemove', (e) => {
       if (!isDragging) return;
-      const dx = (e.clientX - startX) * (this.viewBox.w / this.svg.clientWidth);
-      const dy = (e.clientY - startY) * (this.viewBox.h / this.svg.clientHeight);
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) this.wasPanning = true;
-      this.viewBox.x -= dx;
-      this.viewBox.y -= dy;
-      startX = e.clientX;
-      startY = e.clientY;
+      const dx = (e.clientX - startX) * (this.viewBox.w / (this.svg.clientWidth || 1000));
+      const dy = (e.clientY - startY) * (this.viewBox.h / (this.svg.clientHeight || 1330));
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) this.wasPanning = true;
+      this.viewBox.x -= dx; this.viewBox.y -= dy;
+      startX = e.clientX; startY = e.clientY;
       this.applyViewBox();
     });
 
@@ -200,18 +213,19 @@ export class MapRenderer {
     this.svg.addEventListener('wheel', (e) => {
       e.preventDefault();
       const factor = e.deltaY < 0 ? 0.9 : 1.1;
-      const newW = Math.max(300, Math.min(1800, this.viewBox.w * factor));
-      const newH = Math.max(420, Math.min(2520, this.viewBox.h * factor));
+      const newW = Math.max(250, Math.min(1000, this.viewBox.w * factor));
+      const newH = Math.max(332, Math.min(1330, this.viewBox.h * factor));
       this.viewBox.x -= (newW - this.viewBox.w) / 2;
       this.viewBox.y -= (newH - this.viewBox.h) / 2;
-      this.viewBox.w = newW;
-      this.viewBox.h = newH;
+      this.viewBox.w = newW; this.viewBox.h = newH;
       this.applyViewBox();
     }, { passive: false });
   }
 
   applyViewBox() {
+    this.zoomLevel = 1000 / this.viewBox.w;
     this.svg.setAttribute('viewBox', `${this.viewBox.x} ${this.viewBox.y} ${this.viewBox.w} ${this.viewBox.h}`);
+    this.updateLabelVisibility();
   }
 
   resetView() {
@@ -219,153 +233,134 @@ export class MapRenderer {
     this.applyViewBox();
   }
 
+  setTravelMode(mode) {
+    this.travelMode = mode;
+    const isTrain = mode === 'train' || mode === 'rail';
+    for (const [id, g] of Object.entries(this.cityElements)) {
+      if (isTrain && !this.graph.cities[id].rail) g.classList.add('city-dimmed');
+      else g.classList.remove('city-dimmed');
+    }
+  }
+
   setSelection(fromId, toId) {
     this.selectedFromId = fromId;
     this.selectedToId = toId;
-    for (const [id, g] of Object.entries(this.stationElements)) {
-      g.classList.remove('selected-from', 'selected-to');
-      if (id === fromId) g.classList.add('selected-from');
-      if (id === toId) g.classList.add('selected-to');
+    for (const [id, g] of Object.entries(this.cityElements)) {
+      g.classList.toggle('selected-from', id === fromId);
+      g.classList.toggle('selected-to', id === toId);
     }
+    this.drawPins();
     this.updateLabelVisibility();
   }
 
-  showLabel(stationId, hover = false) {
-    const label = this.labelElements[stationId];
-    if (label && !label.classList.contains('label-always')) {
-      label.classList.add('label-hover');
-      setTimeout(() => { if (!hover) label.classList.remove('label-hover'); }, 2000);
-    }
+  drawPins() {
+    this.layers.pins.innerHTML = '';
+    const addPin = (cityId, cls) => {
+      const c = this.graph.cities[cityId];
+      if (!c) return;
+      const pin = this.createSvgEl('g', { class: `map-pin ${cls}`, transform: `translate(${c.x}, ${c.y - 12})` });
+      pin.innerHTML = '<circle r="7" class="pin-head" /><path d="M-4 0 L0 10 L4 0 Z" class="pin-needle" />';
+      this.layers.pins.appendChild(pin);
+    };
+    if (this.selectedFromId) addPin(this.selectedFromId, 'pin-start');
+    if (this.selectedToId) addPin(this.selectedToId, 'pin-end');
   }
 
   updateLabelVisibility() {
+    const isMobile = window.innerWidth < 768, z = this.zoomLevel;
     for (const [id, label] of Object.entries(this.labelElements)) {
-      const isAlways = this.graph.stations[id].isInterchange || TERMINAL_STATIONS.has(id);
-      const isSelected = (id === this.selectedFromId) || (id === this.selectedToId);
-      if (isAlways || isSelected) label.classList.add('label-active');
-      else label.classList.remove('label-active');
-      label.classList.remove('label-hover');
+      const city = this.graph.cities[id];
+      const isSelected = id === this.selectedFromId || id === this.selectedToId;
+      const isOnRoute = this.routeCityIds.has(id);
+      if (isSelected || isOnRoute) { label.classList.add('label-visible'); continue; }
+
+      if (isMobile) {
+        label.classList.toggle('label-visible', city.tier === 1 || (city.tier === 2 && z >= 1.6) || (city.tier === 3 && z >= 2.5));
+      } else {
+        label.classList.toggle('label-visible', city.tier === 1 || city.tier === 2 || (city.tier === 3 && z >= 1.6));
+      }
     }
   }
 
-  // Animation: Station visited (pulsing ripple and glow)
-  animateStationVisit(stationId, color = '#56CCF2') {
-    const station = this.graph.stations[stationId];
-    const group = this.stationElements[stationId];
-    if (!station || !group) return;
+  animateCityVisit(cityId, color = 'var(--accent)') {
+    const city = this.graph.cities[cityId], group = this.cityElements[cityId];
+    if (!city || !group) return;
 
-    const ripple = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    ripple.setAttribute('cx', station.x);
-    ripple.setAttribute('cy', station.y);
-    ripple.setAttribute('r', '8');
-    ripple.setAttribute('fill', 'none');
-    ripple.setAttribute('stroke', color);
-    ripple.setAttribute('stroke-width', '3');
-    ripple.setAttribute('class', 'search-ripple');
-    this.searchLayer.appendChild(ripple);
-    setTimeout(() => ripple.remove(), 700);
+    const ripple = this.createSvgEl('circle', { cx: city.x, cy: city.y, r: 8, class: 'search-ripple' });
+    ripple.style.stroke = color;
+    this.layers.search.appendChild(ripple);
+    setTimeout(() => ripple.remove(), 650);
 
-    const dot = group.querySelector('.station-dot');
+    const dot = group.querySelector('.city-dot');
     if (dot) {
       dot.style.stroke = color;
-      dot.style.fill = color;
       dot.classList.add('pulse-once');
       setTimeout(() => dot.classList.remove('pulse-once'), 300);
     }
-    group.classList.add('station-explored');
+    group.classList.add('city-explored');
   }
 
-  animateQueueCandidate(stationId) {
-    const group = this.stationElements[stationId];
-    if (group && !group.classList.contains('station-explored')) {
-      group.classList.add('station-in-queue');
-    }
+  animateQueueCandidate(cityId) {
+    const group = this.cityElements[cityId];
+    if (group && !group.classList.contains('city-explored')) group.classList.add('city-in-queue');
   }
 
   animateRouteDraw(path, onComplete = null) {
     this.clearRoute();
-    if (!path || path.length < 2) {
-      if (onComplete) onComplete();
-      return;
-    }
+    if (!path || path.length < 2) { if (onComplete) onComplete(); return; }
 
     const points = [];
+    this.routeCityIds.clear();
     for (const stop of path) {
-      const s = this.graph.stations[stop.stationId];
-      if (s) {
-        points.push(`${s.x},${s.y}`);
-        const el = this.stationElements[stop.stationId];
-        if (el) el.classList.add('route-station');
+      const c = this.graph.cities[stop.cityId];
+      if (c) {
+        points.push(`${c.x},${c.y}`);
+        this.routeCityIds.add(stop.cityId);
+        this.cityElements[stop.cityId]?.classList.add('route-city');
       }
     }
+    this.updateLabelVisibility();
 
-    const glowPath = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-    glowPath.setAttribute('points', points.join(' '));
-    glowPath.setAttribute('fill', 'none');
-    glowPath.setAttribute('stroke', '#FFB020');
-    glowPath.setAttribute('stroke-width', '12');
-    glowPath.setAttribute('stroke-linecap', 'round');
-    glowPath.setAttribute('stroke-linejoin', 'round');
-    glowPath.setAttribute('class', 'route-outer-glow');
-    glowPath.setAttribute('filter', 'url(#route-glow)');
-    this.routeLayer.appendChild(glowPath);
+    const glow = this.createSvgEl('polyline', { points: points.join(' '), class: 'route-outer-glow', filter: 'url(#route-glow)' });
+    const core = this.createSvgEl('polyline', { points: points.join(' '), class: 'route-inner-core' });
+    this.layers.route.append(glow, core);
 
-    const corePath = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-    corePath.setAttribute('points', points.join(' '));
-    corePath.setAttribute('fill', 'none');
-    corePath.setAttribute('stroke', '#FFFFFF');
-    corePath.setAttribute('stroke-width', '4');
-    corePath.setAttribute('stroke-linecap', 'round');
-    corePath.setAttribute('stroke-linejoin', 'round');
-    corePath.setAttribute('class', 'route-inner-core');
-    this.routeLayer.appendChild(corePath);
+    const totalLength = core.getTotalLength ? core.getTotalLength() : 1200;
+    glow.style.strokeDasharray = `${totalLength} ${totalLength}`;
+    glow.style.strokeDashoffset = `${totalLength}`;
+    core.style.strokeDasharray = `${totalLength} ${totalLength}`;
+    core.style.strokeDashoffset = `${totalLength}`;
 
-    const totalLength = corePath.getTotalLength ? corePath.getTotalLength() : 1200;
-    glowPath.style.strokeDasharray = `${totalLength} ${totalLength}`;
-    glowPath.style.strokeDashoffset = `${totalLength}`;
-    corePath.style.strokeDasharray = `${totalLength} ${totalLength}`;
-    corePath.style.strokeDashoffset = `${totalLength}`;
-
-    const duration = 650;
-    const startTime = performance.now();
-
-    const animateStroke = (currentTime) => {
-      const elapsed = currentTime - startTime;
+    const duration = 650, startTime = performance.now();
+    const step = (now) => {
+      const elapsed = now - startTime;
       const progress = Math.min(elapsed / duration, 1);
       const ease = 1 - Math.pow(1 - progress, 3);
       const offset = totalLength * (1 - ease);
-
-      glowPath.style.strokeDashoffset = `${offset}`;
-      corePath.style.strokeDashoffset = `${offset}`;
-
-      if (progress < 1) {
-        requestAnimationFrame(animateStroke);
-      } else {
-        glowPath.style.strokeDasharray = 'none';
-        corePath.style.strokeDasharray = 'none';
+      glow.style.strokeDashoffset = `${offset}`;
+      core.style.strokeDashoffset = `${offset}`;
+      if (progress < 1) requestAnimationFrame(step);
+      else {
+        glow.style.strokeDasharray = 'none'; core.style.strokeDasharray = 'none';
         if (onComplete) onComplete();
       }
     };
-    requestAnimationFrame(animateStroke);
+    requestAnimationFrame(step);
   }
 
   clearSearchHighlights() {
-    this.searchLayer.innerHTML = '';
-    for (const g of Object.values(this.stationElements || {})) {
-      g.classList.remove('station-explored', 'station-in-queue');
-      const dot = g.querySelector('.station-dot');
-      if (dot) {
-        dot.style.stroke = '';
-        dot.style.fill = '';
-      }
+    this.layers.search.innerHTML = '';
+    for (const g of Object.values(this.cityElements || {})) {
+      g.classList.remove('city-explored', 'city-in-queue');
+      const dot = g.querySelector('.city-dot');
+      if (dot) dot.style.stroke = '';
     }
   }
 
   clearRoute() {
-    this.routeLayer.innerHTML = '';
-    this.activeRoute = null;
-    for (const g of Object.values(this.stationElements || {})) {
-      g.classList.remove('route-station');
-    }
+    this.layers.route.innerHTML = '';
+    this.routeCityIds.clear();
+    for (const g of Object.values(this.cityElements || {})) g.classList.remove('route-city');
+    this.updateLabelVisibility();
   }
 }

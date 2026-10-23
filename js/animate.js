@@ -16,6 +16,7 @@ export class AnimationController {
     this.speedMs = 45; // default normal speed
 
     this.currentAlgorithm = 'dijkstra';
+    this.travelMode = 'any';
     this.currentMode = 'single'; // 'single' | 'compare'
     this.onCompleteCallback = null;
   }
@@ -23,26 +24,27 @@ export class AnimationController {
   setSpeed(level) {
     if (level === 'slow') this.speedMs = 140;
     else if (level === 'fast') this.speedMs = 12;
-    else this.speedMs = 45; // normal
+    else this.speedMs = 45;
   }
 
   // Start single algorithm animation
-  start(startStationId, targetStationId, algorithm = 'dijkstra', onComplete = null) {
+  start(startCityId, targetCityId, algorithm = 'dijkstra', travelMode = 'any', onComplete = null) {
     this.stop();
     this.currentAlgorithm = algorithm;
+    this.travelMode = travelMode;
     this.currentMode = 'single';
     this.onCompleteCallback = onComplete;
 
     this.renderer.clearRoute();
     this.renderer.clearSearchHighlights();
-    this.renderer.setSelection(startStationId, targetStationId);
+    this.renderer.setSelection(startCityId, targetCityId);
 
     if (algorithm === 'astar') {
-      this.generator = astar(this.graph, startStationId, targetStationId);
+      this.generator = astar(this.graph, startCityId, targetCityId, travelMode);
     } else if (algorithm === 'bfs') {
-      this.generator = bfs(this.graph, startStationId, targetStationId);
+      this.generator = bfs(this.graph, startCityId, targetCityId, travelMode);
     } else {
-      this.generator = dijkstra(this.graph, startStationId, targetStationId);
+      this.generator = dijkstra(this.graph, startCityId, targetCityId, travelMode);
     }
 
     this.isRunning = true;
@@ -52,7 +54,6 @@ export class AnimationController {
     this.tick();
   }
 
-  // Single step execution
   step() {
     if (!this.generator) return;
     this.pause();
@@ -78,13 +79,15 @@ export class AnimationController {
     }
 
     const event = res.value;
-    const color = this.currentAlgorithm === 'astar' ? '#FFB020' : (this.currentAlgorithm === 'bfs' ? '#27AE60' : '#56CCF2');
+    const color = this.currentAlgorithm === 'astar' ? 'var(--astar)' : (this.currentAlgorithm === 'bfs' ? 'var(--brand)' : 'var(--dijkstra)');
 
     if (event.type === 'visit') {
-      this.renderer.animateStationVisit(event.stationId, color);
+      this.renderer.animateCityVisit(event.cityId, color);
       this.ui.updateUnderTheHood(event, this.currentAlgorithm);
     } else if (event.type === 'queue') {
-      this.renderer.animateQueueCandidate(event.toStationId);
+      if (event.toCityId) {
+        this.renderer.animateQueueCandidate(event.toCityId);
+      }
     } else if (event.type === 'done') {
       this.handleAlgorithmDone(event);
       return true;
@@ -106,7 +109,8 @@ export class AnimationController {
         }
       });
     } else {
-      this.ui.showError('No route found between selected stations.');
+      const msg = event.stepsText?.[0] || 'No route found between selected cities.';
+      this.ui.showError(msg);
       if (this.onCompleteCallback) {
         this.onCompleteCallback(event);
       }
@@ -140,7 +144,7 @@ export class AnimationController {
   }
 
   // Compare mode sequence: runs Dijkstra, then A*, then shows side-by-side comparison
-  async runCompare(startStationId, targetStationId, onFinish = null) {
+  async runCompare(startCityId, targetCityId, travelMode = 'any', onFinish = null) {
     this.stop();
     this.currentMode = 'compare';
 
@@ -148,30 +152,30 @@ export class AnimationController {
     this.currentAlgorithm = 'dijkstra';
     this.renderer.clearRoute();
     this.renderer.clearSearchHighlights();
-    this.renderer.setSelection(startStationId, targetStationId);
-    this.ui.showCompareStatus('Running Dijkstra across city...');
+    this.renderer.setSelection(startCityId, targetCityId);
+    this.ui.showCompareStatus('Running Dijkstra across Tamil Nadu...');
 
     let dijkstraResult = null;
     await new Promise((resolve) => {
-      this.start(startStationId, targetStationId, 'dijkstra', (res) => {
+      this.start(startCityId, targetCityId, 'dijkstra', travelMode, (res) => {
         dijkstraResult = res;
         resolve();
       });
     });
 
-    // 2. Pause to observe Dijkstra search ripple
+    // 2. Pause to observe Dijkstra search coverage
     await new Promise((r) => setTimeout(r, 600));
 
     // 3. Clear and Run A*
     this.currentAlgorithm = 'astar';
     this.renderer.clearRoute();
     this.renderer.clearSearchHighlights();
-    this.renderer.setSelection(startStationId, targetStationId);
+    this.renderer.setSelection(startCityId, targetCityId);
     this.ui.showCompareStatus('Running A* with directional sense...');
 
     let astarResult = null;
     await new Promise((resolve) => {
-      this.start(startStationId, targetStationId, 'astar', (res) => {
+      this.start(startCityId, targetCityId, 'astar', travelMode, (res) => {
         astarResult = res;
         resolve();
       });

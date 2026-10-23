@@ -18,6 +18,7 @@ const isTestMode = urlParams.get('test') === '1';
 const isDemoMode = urlParams.get('demo') === '1';
 const paramFrom = urlParams.get('from');
 const paramTo = urlParams.get('to');
+const paramMode = urlParams.get('mode') || 'any';
 
 if (isTestMode) {
   console.log('Running Namma Route Self-Test...');
@@ -62,11 +63,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   ui.setControllers(animator, demo);
 
+  if (paramMode && paramMode !== 'any') {
+    ui.travelMode = paramMode;
+    renderer.setTravelMode(paramMode);
+    document.querySelectorAll('.travel-tab-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.getAttribute('data-travel') === paramMode);
+    });
+  }
+
   // Check URL parameters for trip or demo mode
   if (paramFrom && paramTo && graph.cities[paramFrom] && graph.cities[paramTo]) {
     ui.setStation('from', paramFrom);
     ui.setStation('to', paramTo);
-    animator.start(paramFrom, paramTo, 'dijkstra');
+    animator.start(paramFrom, paramTo, 'dijkstra', paramMode);
   } else if (isDemoMode) {
     demo.start();
   } else {
