@@ -2,7 +2,10 @@
 // Draws schematic metro map on 1000 x 1400 viewBox canvas
 // Handles line strokes, station dots, labels, search ripples, route drawing, and zoom/pan
 
-import { LINES, CONNECTORS } from './data.js';
+import { ROAD_LINKS, RAIL_LINKS } from './tn-data.js';
+
+const LINES = {};
+const CONNECTORS = [];
 
 const TERMINAL_STATIONS = new Set([
   'wimco-nagar-depot', 'chennai-airport', 'chennai-central',

@@ -1,234 +1,263 @@
-// Graph construction for Namma Route
-// Builds both:
-// 1. Line-node graph (61 nodes) for Dijkstra and A*
-// 2. Station-level graph (59 nodes) for BFS
+// Graph construction for Namma Route: Tamil Nadu Transit Network
+// Builds road nodes, rail nodes, transfer links, and computes heuristic constant k
 
-import { STATIONS, LINES, INTERCHANGE_TRANSFER_TIME, CONNECTORS } from './data.js';
+import {
+  CITIES,
+  ROAD_LINKS,
+  RAIL_LINKS,
+  TRANSFER_MINUTES,
+  VIEWBOX,
+  STATE_OUTLINE,
+  SPEEDS_KMPH,
+  EXPECTED
+} from './tn-data.js';
 
-// Calculate Euclidean distance between two points
-export function distance(x1, y1, x2, y2) {
-  return Math.hypot(x2 - x1, y2 - y1);
+// Haversine formula for straight-line distance on Earth sphere (radius = 6371 km)
+export function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
-// Build and return the network graphs
 export function buildGraph() {
-  const stationMap = {};
-  const lineNodes = {};
-  const stationGraph = {}; // For BFS: stationId -> Set of neighbor stationIds
-  const edges = [];
-
-  // 1. Initialize station map
-  for (const [id, s] of Object.entries(STATIONS)) {
-    stationMap[id] = {
-      ...s,
-      lines: [],
-      lineNodeIds: []
-    };
-    stationGraph[id] = new Set();
+  const cities = {};
+  for (const c of CITIES) {
+    cities[c.id] = { ...c };
   }
 
-  // 2. Create line nodes for each line and connect consecutive stations
-  for (const line of Object.values(LINES)) {
-    const stationIds = line.stations;
-
-    for (let i = 0; i < stationIds.length; i++) {
-      const sId = stationIds[i];
-      const station = stationMap[sId];
-      if (!station) {
-        throw new Error(`Station not found: ${sId}`);
-      }
-
-      if (!station.lines.includes(line.id)) {
-        station.lines.push(line.id);
-      }
-
-      const lineNodeId = `${sId}_${line.id}`;
-      if (!station.lineNodeIds.includes(lineNodeId)) {
-        station.lineNodeIds.push(lineNodeId);
-      }
-
-      if (!lineNodes[lineNodeId]) {
-        lineNodes[lineNodeId] = {
-          id: lineNodeId,
-          stationId: sId,
-          lineId: line.id,
-          stationName: station.name,
-          x: station.x,
-          y: station.y,
-          neighbors: []
-        };
-      }
-
-      // Add edge to previous station on this line
-      if (i > 0) {
-        const prevStationId = stationIds[i - 1];
-        const prevLineNodeId = `${prevStationId}_${line.id}`;
-        const travelTime = line.travelTime;
-        const dist = distance(station.x, station.y, stationMap[prevStationId].x, stationMap[prevStationId].y);
-
-        // Forward edge
-        const edgeForward = {
-          from: prevLineNodeId,
-          to: lineNodeId,
-          fromStationId: prevStationId,
-          toStationId: sId,
-          minutes: travelTime,
-          type: line.id === 'mrts' ? 'mrts' : 'metro',
-          lineId: line.id,
-          distance: dist
-        };
-        lineNodes[prevLineNodeId].neighbors.push(edgeForward);
-        edges.push(edgeForward);
-
-        // Backward edge
-        const edgeBackward = {
-          from: lineNodeId,
-          to: prevLineNodeId,
-          fromStationId: sId,
-          toStationId: prevStationId,
-          minutes: travelTime,
-          type: line.id === 'mrts' ? 'mrts' : 'metro',
-          lineId: line.id,
-          distance: dist
-        };
-        lineNodes[lineNodeId].neighbors.push(edgeBackward);
-        edges.push(edgeBackward);
-
-        // Add to station-level graph for BFS
-        stationGraph[sId].add(prevStationId);
-        stationGraph[prevStationId].add(sId);
-      }
-    }
-  }
-
-  // Mark interchanges (stations on multiple lines)
-  for (const station of Object.values(stationMap)) {
-    station.isInterchange = station.lines.length > 1;
-  }
-
-  // 3. Add interchange transfer edges between line nodes at the same station
-  for (const station of Object.values(stationMap)) {
-    if (station.lineNodeIds.length > 1) {
-      for (let i = 0; i < station.lineNodeIds.length; i++) {
-        for (let j = i + 1; j < station.lineNodeIds.length; j++) {
-          const nodeA = station.lineNodeIds[i];
-          const nodeB = station.lineNodeIds[j];
-
-          const edgeAB = {
-            from: nodeA,
-            to: nodeB,
-            fromStationId: station.id,
-            toStationId: station.id,
-            minutes: INTERCHANGE_TRANSFER_TIME,
-            type: 'transfer',
-            lineId: null,
-            distance: 0
-          };
-          lineNodes[nodeA].neighbors.push(edgeAB);
-          edges.push(edgeAB);
-
-          const edgeBA = {
-            from: nodeB,
-            to: nodeA,
-            fromStationId: station.id,
-            toStationId: station.id,
-            minutes: INTERCHANGE_TRANSFER_TIME,
-            type: 'transfer',
-            lineId: null,
-            distance: 0
-          };
-          lineNodes[nodeB].neighbors.push(edgeBA);
-          edges.push(edgeBA);
-        }
-      }
-    }
-  }
-
-  // 4. Add connector links (walk/bus) to every line node of each connected station
-  for (const conn of CONNECTORS) {
-    const fromStation = stationMap[conn.from];
-    const toStation = stationMap[conn.to];
-    if (!fromStation || !toStation) {
-      throw new Error(`Connector station not found: ${conn.from} or ${conn.to}`);
-    }
-
-    const dist = distance(fromStation.x, fromStation.y, toStation.x, toStation.y);
-
-    // Join to every line node of each station
-    for (const fromNodeId of fromStation.lineNodeIds) {
-      for (const toNodeId of toStation.lineNodeIds) {
-        const edgeForward = {
-          from: fromNodeId,
-          to: toNodeId,
-          fromStationId: fromStation.id,
-          toStationId: toStation.id,
-          minutes: conn.minutes,
-          type: conn.type,
-          lineId: null,
-          distance: dist
-        };
-        lineNodes[fromNodeId].neighbors.push(edgeForward);
-        edges.push(edgeForward);
-
-        const edgeBackward = {
-          from: toNodeId,
-          to: fromNodeId,
-          fromStationId: toStation.id,
-          toStationId: fromStation.id,
-          minutes: conn.minutes,
-          type: conn.type,
-          lineId: null,
-          distance: dist
-        };
-        lineNodes[toNodeId].neighbors.push(edgeBackward);
-        edges.push(edgeBackward);
-      }
-    }
-
-    // Add to station-level graph for BFS
-    stationGraph[fromStation.id].add(toStation.id);
-    stationGraph[toStation.id].add(fromStation.id);
-  }
-
-  // Convert stationGraph Sets to Arrays
-  const stationAdjacency = {};
-  for (const [sId, set] of Object.entries(stationGraph)) {
-    stationAdjacency[sId] = Array.from(set);
-  }
-
-  // 5. Compute k for A* heuristic
-  // k is the smallest value of (minutes / distance) across all edges with distance > 0
+  // 1. Calculate k across all road and rail links
   let minRatio = Infinity;
-  for (const edge of edges) {
-    if (edge.distance > 0) {
-      const ratio = edge.minutes / edge.distance;
-      if (ratio < minRatio) {
-        minRatio = ratio;
-      }
+  const allRawLinks = [
+    ...ROAD_LINKS.map((l) => ({ ...l, modeType: 'road' })),
+    ...RAIL_LINKS.map((l) => ({ ...l, modeType: 'rail' }))
+  ];
+
+  for (const link of allRawLinks) {
+    const c1 = cities[link.a];
+    const c2 = cities[link.b];
+    const d = haversineKm(c1.lat, c1.lng, c2.lat, c2.lng);
+    const ratio = link.min / d;
+    if (ratio < minRatio) {
+      minRatio = ratio;
     }
   }
-
   const k = minRatio;
 
-  // Heuristic function for A* (admissible and consistent)
-  const heuristic = (stationAId, stationBId) => {
-    const a = stationMap[stationAId];
-    const b = stationMap[stationBId];
+  // 2. Initialize nodes
+  const nodes = {};
+  const cityNodes = {};
+
+  for (const c of CITIES) {
+    cityNodes[c.id] = [];
+
+    // Road node for every city
+    const roadNodeId = `${c.id}:road`;
+    nodes[roadNodeId] = {
+      id: roadNodeId,
+      cityId: c.id,
+      cityName: c.name,
+      type: 'road',
+      x: c.x,
+      y: c.y,
+      neighbors: []
+    };
+    cityNodes[c.id].push(roadNodeId);
+
+    // Rail node only for cities with railway station
+    if (c.rail) {
+      const railNodeId = `${c.id}:rail`;
+      nodes[railNodeId] = {
+        id: railNodeId,
+        cityId: c.id,
+        cityName: c.name,
+        stationName: c.station || c.name,
+        type: 'rail',
+        x: c.x,
+        y: c.y,
+        neighbors: []
+      };
+      cityNodes[c.id].push(railNodeId);
+    }
+  }
+
+  const edges = [];
+
+  // 3. Road links (bidirectional between road nodes)
+  for (const link of ROAD_LINKS) {
+    const nA = `${link.a}:road`;
+    const nB = `${link.b}:road`;
+
+    const edgeAB = {
+      from: nA,
+      to: nB,
+      fromCityId: link.a,
+      toCityId: link.b,
+      min: link.min,
+      km: link.km,
+      kind: link.kind,
+      type: 'road',
+      offset: link.offset
+    };
+    nodes[nA].neighbors.push(edgeAB);
+    edges.push(edgeAB);
+
+    const edgeBA = {
+      from: nB,
+      to: nA,
+      fromCityId: link.b,
+      toCityId: link.a,
+      min: link.min,
+      km: link.km,
+      kind: link.kind,
+      type: 'road',
+      offset: link.offset
+    };
+    nodes[nB].neighbors.push(edgeBA);
+    edges.push(edgeBA);
+  }
+
+  // 4. Rail links (bidirectional between rail nodes)
+  for (const link of RAIL_LINKS) {
+    const nA = `${link.a}:rail`;
+    const nB = `${link.b}:rail`;
+
+    const edgeAB = {
+      from: nA,
+      to: nB,
+      fromCityId: link.a,
+      toCityId: link.b,
+      min: link.min,
+      km: link.km,
+      kind: link.kind,
+      type: 'rail',
+      offset: link.offset
+    };
+    nodes[nA].neighbors.push(edgeAB);
+    edges.push(edgeAB);
+
+    const edgeBA = {
+      from: nB,
+      to: nA,
+      fromCityId: link.b,
+      toCityId: link.a,
+      min: link.min,
+      km: link.km,
+      kind: link.kind,
+      type: 'rail',
+      offset: link.offset
+    };
+    nodes[nB].neighbors.push(edgeBA);
+    edges.push(edgeBA);
+  }
+
+  // 5. Transfer edges in Any mode (between road and rail nodes of same city)
+  for (const c of CITIES) {
+    if (c.rail) {
+      const roadNodeId = `${c.id}:road`;
+      const railNodeId = `${c.id}:rail`;
+
+      const toRailEdge = {
+        from: roadNodeId,
+        to: railNodeId,
+        fromCityId: c.id,
+        toCityId: c.id,
+        min: TRANSFER_MINUTES,
+        km: 0,
+        kind: 'transfer',
+        type: 'transfer',
+        offset: 0
+      };
+      nodes[roadNodeId].neighbors.push(toRailEdge);
+      edges.push(toRailEdge);
+
+      const toRoadEdge = {
+        from: railNodeId,
+        to: roadNodeId,
+        fromCityId: c.id,
+        toCityId: c.id,
+        min: TRANSFER_MINUTES,
+        km: 0,
+        kind: 'transfer',
+        type: 'transfer',
+        offset: 0
+      };
+      nodes[railNodeId].neighbors.push(toRoadEdge);
+      edges.push(toRoadEdge);
+    }
+  }
+
+  // Sort each neighbor list by destination node name alphabetically
+  for (const node of Object.values(nodes)) {
+    node.neighbors.sort((a, b) => a.to.localeCompare(b.to));
+  }
+
+  // 6. City adjacency maps for BFS
+  const cityGraph = {
+    road: {},
+    rail: {},
+    any: {}
+  };
+
+  for (const c of CITIES) {
+    cityGraph.road[c.id] = new Set();
+    cityGraph.rail[c.id] = new Set();
+    cityGraph.any[c.id] = new Set();
+  }
+
+  for (const l of ROAD_LINKS) {
+    cityGraph.road[l.a].add(l.b);
+    cityGraph.road[l.b].add(l.a);
+    cityGraph.any[l.a].add(l.b);
+    cityGraph.any[l.b].add(l.a);
+  }
+
+  for (const l of RAIL_LINKS) {
+    cityGraph.rail[l.a].add(l.b);
+    cityGraph.rail[l.b].add(l.a);
+    cityGraph.any[l.a].add(l.b);
+    cityGraph.any[l.b].add(l.a);
+  }
+
+  for (const mode of ['road', 'rail', 'any']) {
+    for (const c of CITIES) {
+      cityGraph[mode][c.id] = Array.from(cityGraph[mode][c.id]).sort();
+    }
+  }
+
+  // A* straight-line heuristic function
+  const heuristic = (cityAId, cityBId) => {
+    const a = cities[cityAId];
+    const b = cities[cityBId];
     if (!a || !b) return 0;
-    const d = distance(a.x, a.y, b.x, b.y);
-    return k * d;
+    const dist = haversineKm(a.lat, a.lng, b.lat, b.lng);
+    return k * dist;
   };
 
   return {
-    stations: stationMap,
-    lineNodes,
-    stationGraph: stationAdjacency,
+    cities,
+    nodes,
+    cityNodes,
     edges,
+    roadLinks: ROAD_LINKS,
+    railLinks: RAIL_LINKS,
+    cityGraph,
     k,
     heuristic,
-    stationCount: Object.keys(stationMap).length,
-    lineNodeCount: Object.keys(lineNodes).length,
-    directedEdgeCount: edges.length,
-    undirectedEdgeCount: edges.length / 2
+    transferMinutes: TRANSFER_MINUTES,
+    viewbox: VIEWBOX,
+    outline: STATE_OUTLINE,
+    speeds: SPEEDS_KMPH,
+    expected: EXPECTED,
+    cityCount: CITIES.length,
+    roadNodeCount: CITIES.length,
+    railNodeCount: CITIES.filter((c) => c.rail).length,
+    totalNodeCount: Object.keys(nodes).length
   };
 }

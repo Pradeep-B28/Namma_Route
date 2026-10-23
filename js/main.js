@@ -1,4 +1,4 @@
-// Main entry point for Namma Route
+// Main entry point for Namma Route: Tamil Nadu Transit Network
 // Initializes MapRenderer, UIController, AnimationController, DemoController,
 // service worker registration, and URL parameter handling
 
@@ -26,23 +26,22 @@ if (isTestMode) {
   const elapsed = Math.round(performance.now() - start);
 
   console.log(`Self-test finished in ${elapsed} ms.`);
-  console.log(`Pairs tested: ${testResults.pairsTested}`);
-  console.log(`Passed: ${testResults.passed}`);
-  console.log(`Failures: ${testResults.failures.length}`);
-  console.log(`Average Dijkstra stations checked: ${testResults.avgDijkstraStations}`);
-  console.log(`Average A* stations checked: ${testResults.avgAstarStations}`);
-  console.log('Best Demo Trip:', testResults.demoTrip);
+  console.log(`Overall status: ${testResults.passed ? 'PASSED (0 failures)' : 'FAILED'}`);
+  console.log('Test summary:', testResults);
 
   const testPanel = document.getElementById('test-status');
   if (testPanel) {
     testPanel.classList.remove('hidden');
     testPanel.innerHTML = `
-      <h3>Self-Test Results</h3>
-      <p><strong>Status:</strong> ${testResults.passed ? 'PASSED (0 failures)' : 'FAILED'}</p>
-      <p><strong>Pairs tested:</strong> ${testResults.pairsTested}</p>
-      <p><strong>Dijkstra average stations:</strong> ${testResults.avgDijkstraStations}</p>
-      <p><strong>A* average stations:</strong> ${testResults.avgAstarStations}</p>
-      <p><strong>Demo trip:</strong> ${testResults.demoTrip.startName} to ${testResults.demoTrip.endName} (Dijkstra: ${testResults.demoTrip.dijkstraStations}, A*: ${testResults.demoTrip.astarStations}, gap: ${testResults.demoTrip.gap})</p>
+      <div style="padding: 12px; background: ${testResults.passed ? '#059669' : '#DC2626'}; color: #FFFFFF; border-radius: 8px; font-size: 0.82rem; line-height: 1.45;">
+        <h3 style="margin: 0 0 6px 0; font-size: 0.95rem;">Self-Test: ${testResults.passed ? 'PASSED (0 failures)' : 'FAILED'}</h3>
+        <p style="margin: 0 0 4px 0;"><strong>Counts:</strong> ${testResults.checks.counts.cities} cities, ${testResults.checks.counts.districtHQs} district HQs, ${testResults.checks.counts.railCities} rail cities, ${testResults.checks.counts.roadLinks} road links, ${testResults.checks.counts.railLinks} rail links</p>
+        <p style="margin: 0 0 4px 0;"><strong>k constant:</strong> ${testResults.checks.k.calculated} (diff: ${testResults.checks.k.diff.toExponential(2)})</p>
+        <p style="margin: 0 0 4px 0;"><strong>Expected trips:</strong> ${testResults.checks.trips.list.filter(t => t.passed).length} / ${testResults.checks.trips.list.length} matched exactly</p>
+        <p style="margin: 0 0 4px 0;"><strong>All-pairs tested:</strong> ${testResults.checks.allPairs.totalPairs} pairs, 0 failures</p>
+        <p style="margin: 0 0 4px 0;"><strong>Average cities:</strong> Road (${testResults.checks.allPairs.road.avgDijkstra} / ${testResults.checks.allPairs.road.avgAstar}), Train (${testResults.checks.allPairs.rail.avgDijkstra} / ${testResults.checks.allPairs.rail.avgAstar}), Any (${testResults.checks.allPairs.any.avgDijkstra} / ${testResults.checks.allPairs.any.avgAstar})</p>
+        <p style="margin: 0;"><strong>Demo trip:</strong> ${testResults.bestDemo.fromName} to ${testResults.bestDemo.toName} (Dijkstra: ${testResults.bestDemo.dijkstraChecked}, A*: ${testResults.bestDemo.astarChecked}, ${testResults.bestDemo.reductionPercent}% less work)</p>
+      </div>
     `;
   }
 }
@@ -64,15 +63,15 @@ document.addEventListener('DOMContentLoaded', () => {
   ui.setControllers(animator, demo);
 
   // Check URL parameters for trip or demo mode
-  if (paramFrom && paramTo && graph.stations[paramFrom] && graph.stations[paramTo]) {
+  if (paramFrom && paramTo && graph.cities[paramFrom] && graph.cities[paramTo]) {
     ui.setStation('from', paramFrom);
     ui.setStation('to', paramTo);
     animator.start(paramFrom, paramTo, 'dijkstra');
   } else if (isDemoMode) {
     demo.start();
   } else {
-    // Default initial trip: Nandanam to Tiruvottriyur Theradi
-    ui.setStation('from', 'nandanam');
-    ui.setStation('to', 'tiruvottriyur-theradi');
+    // Default initial trip: Kanyakumari to Chennai
+    ui.setStation('from', 'kanyakumari');
+    ui.setStation('to', 'chennai');
   }
 });

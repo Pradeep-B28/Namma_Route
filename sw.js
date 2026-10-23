@@ -7,7 +7,7 @@ const ASSETS_TO_CACHE = [
   './manifest.json',
   './assets/favicon.png',
   './assets/logo.png',
-  './js/data.js',
+  './js/tn-data.js',
   './js/graph.js',
   './js/heap.js',
   './js/algorithms.js',
@@ -16,6 +16,7 @@ const ASSETS_TO_CACHE = [
   './js/animate.js',
   './js/ui.js',
   './js/demo.js',
+  './js/test.js',
   './js/main.js'
 ];
 

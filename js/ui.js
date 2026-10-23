@@ -264,7 +264,9 @@ export class UIController {
 
   updateUnderTheHood(event, algorithm = 'dijkstra') {
     if (this.counterEl) {
-      this.counterEl.textContent = `${event.stationsChecked} / 59`;
+      const checked = event.citiesChecked ?? event.stationsChecked ?? 0;
+      const total = this.graph.cityCount || 55;
+      this.counterEl.textContent = `${checked} / ${total}`;
     }
     if (this.narrationEl) {
       this.narrationEl.textContent = event.narration || '';
@@ -278,13 +280,11 @@ export class UIController {
       for (const item of event.queueSnapshot) {
         const li = document.createElement('li');
         li.className = 'queue-item';
-        let detail = `${item.cost} min`;
-        if (algorithm === 'astar' && item.estimate !== undefined) {
-          detail = `${item.cost}m + ${item.estimate}m = ${item.fScore}m`;
-        }
+        const displayName = item.cityName || item.stationName || '';
+        const displayLabel = item.label || `${displayName} ${item.cost} min`;
         li.innerHTML = `
-          <span class="queue-station">${item.stationName}</span>
-          <span class="queue-cost">${detail}</span>
+          <span class="queue-station">${displayName}</span>
+          <span class="queue-cost">${item.label ? item.label.split(' ').slice(1).join(' ') : `${item.cost} min`}</span>
         `;
         this.queueListEl.appendChild(li);
       }
@@ -292,7 +292,8 @@ export class UIController {
   }
 
   resetUnderTheHood() {
-    if (this.counterEl) this.counterEl.textContent = '0 / 59';
+    const total = this.graph.cityCount || 55;
+    if (this.counterEl) this.counterEl.textContent = `0 / ${total}`;
     if (this.narrationEl) this.narrationEl.textContent = 'Pick a start and destination, then click Find Route.';
     if (this.queueListEl) this.queueListEl.innerHTML = '<li class="queue-empty">Queue empty</li>';
   }
@@ -330,10 +331,10 @@ export class UIController {
   }
 
   renderCompareResult(dijkstraRes, astarRes) {
-    const dStations = dijkstraRes.stationsChecked;
-    const aStations = astarRes.stationsChecked;
-    const gap = dStations - aStations;
-    const pct = Math.max(0, Math.round((gap / dStations) * 100));
+    const dCities = dijkstraRes.citiesChecked ?? dijkstraRes.stationsChecked ?? 0;
+    const aCities = astarRes.citiesChecked ?? astarRes.stationsChecked ?? 0;
+    const gap = dCities - aCities;
+    const pct = Math.max(0, Math.round((gap / dCities) * 100));
 
     this.resultCard.innerHTML = `
       <div class="compare-card">
@@ -342,13 +343,13 @@ export class UIController {
           <div class="metric-box dijkstra-box">
             <span class="metric-name">Dijkstra</span>
             <span class="metric-number" id="count-dijkstra">0</span>
-            <span class="metric-sub">stations checked</span>
+            <span class="metric-sub">cities checked</span>
           </div>
           <div class="metric-vs">vs</div>
           <div class="metric-box astar-box">
             <span class="metric-name">A* Search</span>
             <span class="metric-number" id="count-astar">0</span>
-            <span class="metric-sub">stations checked</span>
+            <span class="metric-sub">cities checked</span>
           </div>
         </div>
         <div class="compare-headline">
@@ -359,8 +360,8 @@ export class UIController {
     `;
     this.resultCard.classList.remove('hidden');
 
-    this.animateNumber('count-dijkstra', dStations, 700);
-    this.animateNumber('count-astar', aStations, 700);
+    this.animateNumber('count-dijkstra', dCities, 700);
+    this.animateNumber('count-astar', aCities, 700);
 
     const shareBtn = document.getElementById('btn-share-compare');
     if (shareBtn) shareBtn.addEventListener('click', () => this.shareRoute());

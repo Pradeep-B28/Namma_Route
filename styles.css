@@ -1,17 +1,83 @@
-:root {
-  --brand-primary: #FFB020;
-  --brand-secondary: #7C5CFF;
-  --bg-color: #0B0F17;
-  --surface-color: #141A26;
-  --surface-elevated: #1B2333;
-  --text-color: #E8ECF3;
-  --text-muted: #8A94A7;
-  --line-blue: #2F80ED;
-  --line-green: #27AE60;
-  --line-mrts: #D16BA5;
-  --line-connector: #5B6577;
-  --glow-dijkstra: #56CCF2;
-  --glow-astar: #FFB020;
+:root, [data-theme="light"] {
+  --bg: #FFFFFF;
+  --bg-grad: linear-gradient(135deg, #ECFDF5 0%, #FFFFFF 45%, #ECFEFF 100%);
+  --surface: #FFFFFF;
+  --surface-2: #F3F4F6;
+  --border: #E5E7EB;
+  --text: #111827;
+  --text-2: #374151;
+  --muted: #6B7280;
+  --brand: #059669;
+  --brand-strong: #047857;
+  --brand-soft: #D1FAE5;
+  --accent: #0891B2;
+  --land: #ECFDF5;
+  --land-stroke: #A7F3D0;
+  --road: #94A3B8;
+  --rail: #334155;
+  --rail-dash: #FFFFFF;
+  --dijkstra: #0891B2;
+  --astar: #D97706;
+  --route-from: #059669;
+  --route-to: #06B6D4;
+  --pin-start: #059669;
+  --pin-end: #E11D48;
+
+  /* Legacy aliases for backward compatibility */
+  --brand-primary: #059669;
+  --brand-secondary: #0891B2;
+  --bg-color: #FFFFFF;
+  --surface-color: #FFFFFF;
+  --surface-elevated: #F3F4F6;
+  --text-color: #111827;
+  --text-muted: #6B7280;
+  --line-blue: #0891B2;
+  --line-green: #059669;
+  --line-mrts: #D97706;
+  --line-connector: #94A3B8;
+  --glow-dijkstra: #0891B2;
+  --glow-astar: #D97706;
+}
+
+[data-theme="dark"] {
+  --bg: #0F172A;
+  --bg-grad: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+  --surface: #1E293B;
+  --surface-2: #334155;
+  --border: #334155;
+  --text: #F1F5F9;
+  --text-2: #CBD5E1;
+  --muted: #94A3B8;
+  --brand: #10B981;
+  --brand-strong: #34D399;
+  --brand-soft: rgba(16, 185, 129, 0.15);
+  --accent: #22D3EE;
+  --land: #0F2431;
+  --land-stroke: #0F5048;
+  --road: #64748B;
+  --rail: #CBD5E1;
+  --rail-dash: #0F172A;
+  --dijkstra: #22D3EE;
+  --astar: #FBBF24;
+  --route-from: #34D399;
+  --route-to: #22D3EE;
+  --pin-start: #34D399;
+  --pin-end: #FB7185;
+
+  /* Legacy aliases for backward compatibility */
+  --brand-primary: #10B981;
+  --brand-secondary: #22D3EE;
+  --bg-color: #0F172A;
+  --surface-color: #1E293B;
+  --surface-elevated: #334155;
+  --text-color: #F1F5F9;
+  --text-muted: #94A3B8;
+  --line-blue: #22D3EE;
+  --line-green: #10B981;
+  --line-mrts: #FBBF24;
+  --line-connector: #64748B;
+  --glow-dijkstra: #22D3EE;
+  --glow-astar: #FBBF24;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }

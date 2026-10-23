@@ -9,38 +9,35 @@
 
 export class MinHeap {
   constructor() {
-    // Each entry is { item, priority, insertOrder }
-    // insertOrder is used as a tie-breaker for deterministic FIFO behavior
+    // Each entry is { item, priority, tieBreaker, order }
     this.elements = [];
     this.counter = 0;
   }
 
-  // Number of elements in the heap
   get size() {
     return this.elements.length;
   }
 
-  // Returns true if the heap is empty
   isEmpty() {
     return this.elements.length === 0;
   }
 
-  // Insert a new item with a numeric priority
-  push(item, priority) {
+  // Insert a new item with numeric priority and optional tieBreaker string
+  push(item, priority, tieBreaker = null) {
     const node = {
       item,
       priority,
+      tieBreaker: tieBreaker ?? item?.nodeId ?? item?.cityId ?? '',
       order: this.counter++
     };
     this.elements.push(node);
     this.bubbleUp(this.elements.length - 1);
   }
 
-  // Remove and return the item with the lowest priority value
+  // Remove and return the item with lowest priority
   pop() {
-    if (this.isEmpty()) {
-      return null;
-    }
+    if (this.isEmpty()) return null;
+
     const minNode = this.elements[0];
     const lastNode = this.elements.pop();
 
@@ -52,12 +49,10 @@ export class MinHeap {
     return minNode.item;
   }
 
-  // Look at the lowest priority item without removing it
   peek() {
     return this.isEmpty() ? null : this.elements[0].item;
   }
 
-  // Move the element at index up until heap order is restored
   bubbleUp(index) {
     let current = index;
 
@@ -65,7 +60,6 @@ export class MinHeap {
       const parent = Math.floor((current - 1) / 2);
 
       if (this.isHigherPriority(this.elements[current], this.elements[parent])) {
-        // Swap with parent
         const temp = this.elements[current];
         this.elements[current] = this.elements[parent];
         this.elements[parent] = temp;
@@ -76,7 +70,6 @@ export class MinHeap {
     }
   }
 
-  // Move the element at index down until heap order is restored
   sinkDown(index) {
     const length = this.elements.length;
     let current = index;
@@ -101,7 +94,6 @@ export class MinHeap {
       }
 
       if (smallest !== current) {
-        // Swap with the smaller child
         const temp = this.elements[current];
         this.elements[current] = this.elements[smallest];
         this.elements[smallest] = temp;
@@ -112,12 +104,16 @@ export class MinHeap {
     }
   }
 
-  // Helper: returns true if nodeA has higher priority (lower value) than nodeB
+  // Higher priority means lower numerical priority value.
+  // Ties are broken alphabetically by tieBreaker (node name / id).
   isHigherPriority(nodeA, nodeB) {
     if (nodeA.priority < nodeB.priority) {
       return true;
     }
     if (nodeA.priority === nodeB.priority) {
+      if (nodeA.tieBreaker !== nodeB.tieBreaker) {
+        return nodeA.tieBreaker < nodeB.tieBreaker;
+      }
       return nodeA.order < nodeB.order;
     }
     return false;
@@ -129,6 +125,9 @@ export class MinHeap {
       .sort((a, b) => {
         if (a.priority !== b.priority) {
           return a.priority - b.priority;
+        }
+        if (a.tieBreaker !== b.tieBreaker) {
+          return a.tieBreaker.localeCompare(b.tieBreaker);
         }
         return a.order - b.order;
       })

@@ -12,10 +12,10 @@ export class DemoController {
     this.isActive = false;
     this.timeoutId = null;
 
-    // Best demo trip chosen from Phase 1 computation:
-    // Nandanam to Tiruvottriyur Theradi (Dijkstra 56 vs A* 24, 57% reduction)
-    this.demoStartId = 'nandanam';
-    this.demoTargetId = 'tiruvottriyur-theradi';
+    // Best demo trip chosen from Section 10:
+    // Kanyakumari to Chennai (Dijkstra 49 vs A* 16, 67% reduction)
+    this.demoStartId = 'kanyakumari';
+    this.demoTargetId = 'chennai';
 
     this.initCursor();
   }
@@ -74,16 +74,16 @@ export class DemoController {
     const startStation = this.graph.stations[this.demoStartId];
     const targetStation = this.graph.stations[this.demoTargetId];
 
-    // Step 1: Animate tap on From station (Nandanam)
-    await this.animateTap(startStation.x, startStation.y, 'Nandanam');
+    // Step 1: Animate tap on From city (Kanyakumari)
+    await this.animateTap(startStation.x, startStation.y, 'Kanyakumari');
     if (!this.isActive) return;
     this.ui.setStation('from', this.demoStartId);
 
     await this.wait(900);
     if (!this.isActive) return;
 
-    // Step 2: Animate tap on To station (Tiruvottriyur Theradi)
-    await this.animateTap(targetStation.x, targetStation.y, 'Tiruvottriyur Theradi');
+    // Step 2: Animate tap on To city (Chennai)
+    await this.animateTap(targetStation.x, targetStation.y, 'Chennai');
     if (!this.isActive) return;
     this.ui.setStation('to', this.demoTargetId);
 
