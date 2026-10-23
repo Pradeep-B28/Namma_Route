@@ -1,0 +1,21 @@
+{
+  "name": "Namma Route",
+  "short_name": "Namma Route",
+  "description": "Chennai Metro and MRTS route finder with algorithm visualizer",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0B0F17",
+  "theme_color": "#141A26",
+  "icons": [
+    {
+      "src": "assets/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

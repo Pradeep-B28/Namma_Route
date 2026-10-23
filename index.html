@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#141A26">
+  <title>Namma Route - by Wrench Wise</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <img src="assets/logo.png" alt="Wrench Wise Logo" class="brand-logo" onerror="this.style.display='none'" />
+        <h1 class="logo-title">Namma Route</h1>
+        <span class="brand-tag">by Wrench Wise</span>
+      </div>
+      <div class="header-actions">
+        <div class="header-legend">
+          <span class="legend-item"><span class="legend-dot blue"></span>Blue</span>
+          <span class="legend-item"><span class="legend-dot green"></span>Green</span>
+          <span class="legend-item"><span class="legend-dot mrts"></span>MRTS</span>
+        </div>
+        <button type="button" id="btn-demo" class="demo-trigger-btn" title="Watch automated showcase for social reels">Demo</button>
+      </div>
+    </header>
+
+    <!-- Demo Mode Floating Banner -->
+    <div id="demo-banner" class="demo-banner hidden">
+      <div class="demo-banner-content">
+        <span class="demo-indicator-pulse"></span>
+        <span class="demo-banner-text">Demo Mode Auto-Playing</span>
+      </div>
+      <button type="button" id="btn-exit-demo" class="exit-demo-btn">Exit Demo</button>
+    </div>
+
+    <!-- Main Workspace -->
+    <main class="main-workspace">
+      <!-- Left: Map Section -->
+      <section class="map-section" aria-label="Chennai Transit Map">
+        <div id="map-container" class="map-wrapper"></div>
+        <button type="button" id="btn-reset-view" class="reset-view-btn" title="Reset map zoom and center">Reset View</button>
+      </section>
+
+      <!-- Right: Control Panel / Bottom Sheet -->
+      <aside class="panel-section" aria-label="Route Finder Controls">
+        <div class="panel-inner">
+          <div id="test-status" class="test-panel hidden"></div>
+
+          <!-- Trip Picker Form -->
+          <div class="card trip-picker-card">
+            <h2 class="card-title">Plan Your Trip</h2>
+
+            <div class="inputs-row">
+              <div class="input-group">
+                <label for="from-input" class="input-label">From</label>
+                <div class="combobox-wrapper" id="from-picker">
+                  <input
+                    type="text"
+                    id="from-input"
+                    class="station-input"
+                    placeholder="Search start station..."
+                    autocomplete="off"
+                    aria-label="Start station"
+                  />
+                  <div id="from-dropdown" class="station-dropdown"></div>
+                </div>
+              </div>
+
+              <button type="button" id="btn-swap" class="swap-button" title="Swap From and To" aria-label="Swap stations">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M7 16V4M7 4L3 8M7 4L11 8M17 8V20M17 20L21 16M17 20L13 16" />
+                </svg>
+              </button>
+
+              <div class="input-group">
+                <label for="to-input" class="input-label">To</label>
+                <div class="combobox-wrapper" id="to-picker">
+                  <input
+                    type="text"
+                    id="to-input"
+                    class="station-input"
+                    placeholder="Search destination..."
+                    autocomplete="off"
+                    aria-label="Destination station"
+                  />
+                  <div id="to-dropdown" class="station-dropdown"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mode Selector -->
+            <div class="mode-selector-group">
+              <label class="input-label">Search Algorithm</label>
+              <div class="mode-tabs">
+                <button type="button" class="mode-btn active" data-mode="dijkstra" title="Dijkstra explores radially in all directions">
+                  Fastest (Dijkstra)
+                </button>
+                <button type="button" class="mode-btn" data-mode="astar" title="A* guides exploration toward the destination">
+                  Sense of Direction (A*)
+                </button>
+                <button type="button" class="mode-btn" data-mode="bfs" title="Breadth-first search finds fewest station stops">
+                  Fewest Stops (BFS)
+                </button>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons-group">
+              <button type="button" id="btn-find-route" class="primary-button">
+                Find Route
+              </button>
+              <button type="button" id="btn-compare" class="compare-button">
+                Compare Dijkstra vs A*
+              </button>
+            </div>
+          </div>
+
+          <!-- Under The Hood Panel -->
+          <div class="card hood-card">
+            <div class="hood-header">
+              <h3 class="hood-title">Under the Hood</h3>
+              <span id="checked-counter" class="counter-badge">0 / 59</span>
+            </div>
+
+            <p id="step-narration" class="hood-narration">
+              Pick a start and destination, then click Find Route.
+            </p>
+
+            <div class="playback-controls">
+              <button type="button" id="btn-play-pause" class="ctrl-btn">Play</button>
+              <button type="button" id="btn-step" class="ctrl-btn">Step</button>
+              <button type="button" id="btn-reset" class="ctrl-btn">Reset</button>
+              <div class="speed-toggle">
+                <button type="button" class="speed-btn" data-speed="slow">Slow</button>
+                <button type="button" class="speed-btn active" data-speed="normal">Normal</button>
+                <button type="button" class="speed-btn" data-speed="fast">Fast</button>
+              </div>
+            </div>
+
+            <div class="queue-section">
+              <span class="queue-label">Priority Queue (Top 5)</span>
+              <ul id="queue-list" class="queue-list">
+                <li class="queue-empty">Queue empty</li>
+              </ul>
+            </div>
+
+            <button type="button" id="btn-toggle-drawer" class="drawer-toggle-btn" aria-expanded="false">
+              How it works
+            </button>
+
+            <!-- Collapsible Drawer -->
+            <div id="how-it-works-drawer" class="drawer-content">
+              <div class="explainer-topic">
+                <h4>1. What a graph is</h4>
+                <p>A graph is a network of points called vertices, connected by lines called edges.</p>
+                <p>In Namma Route, each station is a vertex and the tracks between them are edges.</p>
+                <p>Each edge has a travel time in minutes.</p>
+                <p>Changing lines at an interchange takes extra time.</p>
+                <p>We model line transfers as edges with a five-minute penalty.</p>
+                <p>This lets the computer treat Chennai transit as a mathematical network.</p>
+              </div>
+
+              <div class="explainer-topic">
+                <h4>2. Dijkstra</h4>
+                <p>Dijkstra was invented by Edsger Dijkstra in 1956.</p>
+                <p>It finds the fastest path by exploring outward in every direction from the start.</p>
+                <p>It always checks the nearest reachable station first using a priority queue.</p>
+                <p>Once it visits a station, it knows the true shortest time to reach it.</p>
+                <p>Because it has no sense of direction, it explores stations behind you as well as ahead.</p>
+                <p>It is guaranteed to find the true fastest route on any network with positive times.</p>
+              </div>
+
+              <div class="explainer-topic">
+                <h4>3. A* and its estimate</h4>
+                <p>A* improves on Dijkstra by adding a sense of direction.</p>
+                <p>At every step, it considers the time spent so far plus an estimate to the destination.</p>
+                <p>In Namma Route, this estimate is straight-line distance multiplied by a safe speed constant.</p>
+                <p>The estimate must never overestimate the true remaining time.</p>
+                <p>Because the estimate is optimistic, A* is guaranteed to find the true fastest route.</p>
+                <p>It focuses search toward the goal and checks far fewer stations than Dijkstra.</p>
+              </div>
+
+              <div class="explainer-topic">
+                <h4>4. BFS (Fewest Stops)</h4>
+                <p>BFS explores a network level by level, like ripples spreading across water.</p>
+                <p>It checks all stations one stop away, then all stations two stops away.</p>
+                <p>BFS ignores travel time and line transfers completely.</p>
+                <p>It only minimizes the total count of station stops.</p>
+                <p>Sometimes a route with fewer stops takes longer because trains run slower or transfers take time.</p>
+                <p>BFS runs directly on the station graph where all lines at a station are merged.</p>
+              </div>
+
+              <div class="explainer-topic">
+                <h4>5. Min-heap</h4>
+                <p>Both Dijkstra and A* need to repeatedly pick the station with the smallest cost.</p>
+                <p>A simple list would take O(N) time to search through on every step.</p>
+                <p>A min-heap is a binary tree stored in a compact array.</p>
+                <p>The smallest item is always at the top at index 0.</p>
+                <p>Adding an item or removing the minimum takes only O(log N) operations.</p>
+                <p>This keeps the search fast and responsive even across large networks.</p>
+              </div>
+
+              <div class="explainer-topic">
+                <h4>6. Big-O Complexity</h4>
+                <p>Dijkstra with a min-heap runs in O((V + E) log V) time, where V is nodes and E is edges.</p>
+                <p>A* has the same worst-case bound, but visits far fewer nodes in practice.</p>
+                <p>BFS runs in O(V + E) time using a simple first-in first-out queue.</p>
+                <p>Without a heap, Dijkstra would take O(V squared) time, which is much slower.</p>
+                <p>Heap push and pop operations take logarithmic time proportional to tree depth.</p>
+                <p>This app models 61 line nodes and 132 directed edges for search.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Result Card -->
+          <div id="result-card" class="card result-card hidden" aria-live="polite"></div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+          <p class="disclaimer">Simplified map for learning. Not official. Times are approximate and may not match real services.</p>
+        </footer>
+      </aside>
+    </main>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-msg" class="toast-message"></div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
