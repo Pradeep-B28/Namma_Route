@@ -1,6 +1,6 @@
 # Understanding Transit Routing and Graph Algorithms
 
-A student guide to pathfinding algorithms using Chennai's metro and MRTS network.
+A student guide to pathfinding algorithms across Tamil Nadu's transit network.
 
 Built by Wrench Wise.
 
@@ -8,156 +8,142 @@ Built by Wrench Wise.
 
 ## 1. The Problem
 
-Every navigation app must answer a basic question. What is the fastest way to get from point A to point B?
+Every navigation app must answer a basic question: What is the fastest route from point A to point B?
 
-When humans look at a map, our eyes jump to the destination. We naturally trace roads that point in the right direction.
+When humans look at a map of Tamil Nadu, our eyes jump to the destination. If we are travelling from Kanyakumari to Chennai, we naturally look north along the eastern coastline and central highways.
 
-Computers cannot see a visual picture. A computer only sees numbers, connections, and costs. To find a route, it must follow formal rules step by step.
-
----
-
-## 2. How a City Becomes a Graph
-
-In computer science, a network is called a graph. A graph has two building blocks:
-
-- **Vertices (Nodes):** The points in the network. In Namma Route, each station is a vertex.
-- **Edges:** The connections between vertices. In this app, transit tracks and connector links are edges.
-
-Edges carry weights representing travel cost. Here, weights represent travel duration in minutes:
-
-- Consecutive stations on Blue or Green Line take 2 minutes.
-- Consecutive stations on MRTS take 3 minutes.
-- Walking and bus connectors take between 7 and 20 minutes.
+Computers cannot look at a picture. A computer only sees numbers, connections, and costs. To find a route across 55 cities, it must follow formal mathematical rules step by step.
 
 ---
 
-## 3. Why Line Changes Are Modelled as Separate Nodes
+## 2. How Tamil Nadu Becomes a Graph
 
-In real transit, changing trains is not instant. You must walk between platforms, wait for the next train, and board.
+In computer science, a network of connections is called a graph. A graph has two fundamental building blocks:
 
-If a station had only one node, entering on the Green Line and leaving on the Blue Line would take zero extra time. That would produce unrealistic routes.
+- **Vertices (Nodes):** The points in the network. In Namma Route, each city represents one or more vertices.
+- **Edges:** The connections between vertices. In this app, highways, state roads, ghat roads, and railway tracks are edges.
 
-To solve this, interchange stations like Chennai Central and Alandur are split into separate line nodes:
+Edges carry weights representing travel cost. In Namma Route, weights represent travel duration in minutes:
 
-- `Alandur (Blue)`
-- `Alandur (Green)`
-
-These two nodes are joined by a transfer edge with a 5-minute penalty. When an algorithm chooses to change lines, it must pay that 5-minute cost. This simple modelling decision ensures realistic routes.
-
----
-
-## 4. A Dijkstra Walk-Through
-
-Consider a trip from Koyambedu to Chennai Airport.
-
-1. **Start:** The search starts at `Koyambedu (Green)` at time 0.
-2. **First step:** Koyambedu explores its neighbours, CMBT and Thirumangalam, adding them to a priority queue with cost 2 minutes.
-3. **Radial expansion:** Dijkstra always visits the lowest-cost unvisited station next. Because CMBT and Thirumangalam are tied at 2 minutes, it visits CMBT, then Thirumangalam.
-4. **Spreading outward:** The search continues along the Green Line toward Alandur. It also spreads backward toward Shenoy Nagar and Egmore because Dijkstra does not know where Chennai Airport is.
-5. **Reaching Alandur:** At minute 16, the search reaches `Alandur (Green)`. From there, it explores the 5-minute transfer edge to `Alandur (Blue)` with total cost 21 minutes.
-6. **Destination reached:** From `Alandur (Blue)`, the search moves south to Nanganallur Road, Meenambakkam, and reaches `Chennai Airport` at minute 23.
-7. **Path reconstruction:** By following parent pointers backward from Chennai Airport, the app builds the final directions: Board Green Line at Koyambedu, change at Alandur to Blue Line, and get off at Chennai Airport.
+- Highways allow faster speeds (80 km/h average).
+- State roads run at moderate speeds (60 km/h average).
+- Winding ghat roads run slowly through hills (30 km/h average).
+- Mainline trains cruise along major corridors (75 km/h average).
+- The Nilgiri Mountain Railway climbs slowly up to Ooty (16 km/h average).
 
 ---
 
-## 5. A* and Why Its Estimate Must Never Overestimate
+## 3. Road, Train, or Both: Multi-Modal Graph Design
 
-Dijkstra explores in every direction because it has no sense of where the destination is.
+In real travel, switching between a bus and a train is not instantaneous. You must disembark, walk between terminals, purchase tickets, and wait for departure.
 
-A* adds a compass called a heuristic function, written as h(n). At each step, A* evaluates stations using:
+If a city had only one combined node, switching from a train to a bus would take zero extra minutes. That would produce unrealistic routes that hop between road and rail at every single town.
+
+To model this accurately, every city in Namma Route has a dedicated road node: `<id>:road`. Every city with a railway station also has a dedicated rail node: `<id>:rail`.
+
+In Any mode, these two nodes are connected by an internal transfer edge with a 30-minute penalty. When an algorithm chooses to change travel modes, it must pay that 30-minute cost.
+
+Consider travelling from Chennai to Ooty in Any mode:
+- The fastest route takes a train from Chennai south-west to Mettupalayam at the foot of the hills.
+- At Mettupalayam, the train route to Ooty on the Nilgiri Mountain Railway takes over 4 hours.
+- Instead, the algorithm chooses to pay the 30-minute transfer penalty to switch from train to road at Mettupalayam, and takes the road up the ghat through Coonoor in about 2 hours.
+- Total travel time: 707 minutes (about 11 h 47 min).
+
+---
+
+## 4. A Walk-Through of Dijkstra Across Tamil Nadu
+
+Consider travelling from Kanyakumari at the southern tip to Chennai in the north.
+
+1. **Start:** The search begins at Kanyakumari at minute 0, adding both its road and rail nodes to a priority queue.
+2. **Radial expansion:** Dijkstra always picks the unvisited node with the lowest travel time so far. It has no idea where Chennai is located.
+3. **Exploring all directions:** The search spreads north along the highway to Tirunelveli and west toward the Kerala border. As time progresses, it explores outward in concentric contours.
+4. **Blind search:** By the time Dijkstra finally reaches Chennai at minute 738, it has evaluated 49 of the 55 cities in Tamil Nadu. It explored westward to Coimbatore and the Nilgiris, eastward to Thanjavur and Nagapattinam, and north-west toward Salem.
+5. **Path reconstruction:** By tracing backward from Chennai through Viluppuram, Tiruchirappalli, Dindigul, Madurai, and Tirunelveli, it constructs the fastest route.
+
+Dijkstra is guaranteed to find the true fastest path, but it does unnecessary work exploring in directions that lead away from the goal.
+
+---
+
+## 5. A* and Its Admissible Straight-Line Estimate
+
+A* improves on Dijkstra by giving the computer a compass. At every step, A* evaluates nodes using the formula:
 
 f(n) = g(n) + h(n)
 
-- **g(n):** The exact time spent travelling from the start to station n.
-- **h(n):** An estimate of remaining time from station n to the destination.
+- **g(n):** The exact travel time spent reaching node n from the start.
+- **h(n):** A heuristic estimate of remaining travel time from node n to the destination.
 
-In Namma Route, h(n) is the straight-line map distance multiplied by a constant k (0.02 min per distance unit).
+In Namma Route, h(n) is calculated using the haversine formula on real latitude and longitude coordinates to find the straight-line distance in kilometers, multiplied by a safe constant k (1.006192 min/km).
 
-A key mathematical rule applies here. The heuristic must be **admissible**. This means h(n) must never overestimate the true remaining travel time.
+The constant k is the smallest ratio of travel time to straight-line distance across all 146 road and rail links in the entire state. Because no vehicle can travel faster than this ratio, straight-line kilometers multiplied by k will never overestimate the true remaining travel time.
 
-Because our constant k is the fastest possible speed across the entire network, straight-line distance multiplied by k is always less than or equal to the true travel time.
+A heuristic that never overestimates is called **admissible**. Because our heuristic is admissible, A* is mathematically guaranteed to find the true fastest route.
 
-When the estimate is optimistic, A* is mathematically guaranteed to find the true fastest route. It simply explores stations pointing toward the destination first, checking far fewer stations along the way.
+When running the same Kanyakumari to Chennai journey:
+- A* prioritizes nodes that point northward toward Chennai.
+- It refuses to waste time exploring westward toward the Western Ghats.
+- A* finds the exact same 738-minute fastest route while checking only 16 cities instead of 49.
+- That represents 67% less computational work.
 
 ---
 
 ## 6. BFS and When Fewest Stops Differs from Fastest
 
-Breadth-First Search (BFS) explores a graph level by level. It checks all stations 1 stop away, then all stations 2 stops away, and so on.
+Breadth-First Search (BFS) explores a graph level by level. It checks all cities 1 stop away, then 2 stops away, and so on.
 
-BFS ignores edge weights entirely. It only counts the number of station hops.
+BFS ignores travel time and road speeds entirely. It only counts the number of city stops.
 
-In transit, "fewest stops" does not always mean "fastest":
-
-- An MRTS route with 5 stops takes 15 minutes (3 minutes per stop).
-- A Metro route with 6 stops takes only 12 minutes (2 minutes per stop).
-
-BFS runs on the station-level graph where interchange nodes are merged. Use BFS when you want to minimize the number of times doors open, and Dijkstra when you want to minimize travel minutes.
+In transit, fewest stops does not mean fastest:
+- Driving from Coimbatore to Ooty via the ghat road takes 2 stops and about 3 hours.
+- Taking the heritage mountain train via Mettupalayam and Coonoor takes 3 stops but over 5 hours.
+- BFS picks the path with the fewest transfers, while Dijkstra and A* pick the path that gets you there earliest.
 
 ---
 
-## 7. The Min-Heap
+## 7. The Binary Min-Heap Priority Queue
 
-During search, the computer must repeatedly find the unvisited station with the lowest score.
+During pathfinding, the computer must repeatedly extract the candidate node with the lowest score.
 
-If we kept an unsorted list of 59 stations, finding the smallest would require scanning every station. That takes O(N) operations every single step.
+If we stored candidates in an unsorted array, finding the minimum node would require scanning every item, taking O(N) linear time at every single step.
 
-A binary min-heap stores elements in an array structured as a tree. The parent at index i has children at indices 2i+1 and 2i+2. Every parent has a score less than or equal to its children.
-
-- The minimum element is always at the top at index 0. We can read it in O(1) constant time.
-- Adding an element (push) takes O(log N) time by bubbling up.
-- Removing the minimum (pop) takes O(log N) time by sinking down.
-
-This hand-written min-heap makes the algorithm fast and smooth even on older phones.
+A binary min-heap arranges elements in an array structured as a complete binary tree. The parent at index i has children at indices 2i+1 and 2i+2:
+- The smallest element is always at the root (index 0), readable in O(1) constant time.
+- Adding a candidate (push) takes O(log N) time by bubbling up.
+- Removing the smallest candidate (pop) takes O(log N) time by sinking down.
+- Ties in priority are broken alphabetically by node name. This ensures results are completely deterministic and repeatable across devices.
 
 ---
 
-## 8. Big-O Complexity Comparison
+## 8. Five "Try This in the App" Activities
 
-| Algorithm | Graph Representation | Time Complexity | Space Complexity | Guarantees |
-|---|---|---|---|---|
-| BFS | Station graph (59 nodes) | O(V + E) | O(V) | Minimizes stop count |
-| Dijkstra | Line-node graph (61 nodes) | O((V + E) log V) | O(V) | Minimizes total minutes |
-| A* Search | Line-node graph (61 nodes) | O((V + E) log V) | O(V) | Minimizes total minutes with fewer visited nodes |
-
-In our network, V is 61 line nodes and E is 132 directed edges.
-
----
-
-## 9. Five "Try This in the App" Activities
-
-### Activity 1: The Cross-City Comparison
-
-- **Trip:** Pick Nandanam as From and Tiruvottriyur Theradi as To.
+### Activity 1: The State-Wide Comparison
+- **Trip:** Pick Kanyakumari as From and Chennai as To in Any mode.
 - **Action:** Click "Compare Dijkstra vs A*".
-- **What to notice:** Dijkstra searches in a wide circle, checking 56 of 59 stations. A* aims north toward the destination and checks only 24 stations. Both find the exact same 30-minute route. A* does 57% less work.
+- **What to notice:** Watch Dijkstra expand radially across 49 cities. Then watch A* aim straight up the transit corridor, checking only 16 cities. Both find the exact same 738-minute route. A* completes the task with 67% less work.
 
-### Activity 2: When Stops Beat Minutes
+### Activity 2: Road vs Train on the Mountain
+- **Trip:** Pick Coimbatore as From and Ooty as To.
+- **Action:** Find the route in Road mode, then switch to Train mode and find the route again.
+- **What to notice:** Road mode takes the mountain highway in about 3 hours. Train mode routes through Mettupalayam and boards the Nilgiri Mountain Railway, taking over 5 hours.
 
-- **Trip:** Pick Chennai Central as From and Velachery as To.
-- **Action:** Switch between "Fastest (Dijkstra)" and "Fewest Stops (BFS)".
-- **What to notice:** Compare the routes. Notice how BFS picks a path based on station count, while Dijkstra accounts for bus links and line speed differences.
+### Activity 3: The 30-Minute Transit Transfer
+- **Trip:** Pick Chennai as From and Ooty as To in Any mode.
+- **Action:** Click Find Route and read the directions step list.
+- **What to notice:** Notice how the algorithm takes an express train to Mettupalayam, pays a 30-minute transfer penalty to switch to road, and drives the remaining 51 km up the mountain. Total time: 707 minutes.
 
-### Activity 3: Watching the Priority Queue
+### Activity 4: Non-Rail Cities in Train Mode
+- **Trip:** Switch travel mode to Train. Tap Kodaikanal on the map.
+- **Action:** Observe the map and toast feedback.
+- **What to notice:** Kodaikanal is dimmed to 40% opacity. Tapping it triggers a small horizontal shake animation and displays a toast message explaining there is no railway station in Kodaikanal.
 
-- **Trip:** Pick Wimco Nagar Depot as From and Chennai Airport as To.
-- **Action:** In the Under the Hood panel, set speed to Slow. Click Find Route, then Pause after 5 steps.
-- **What to notice:** Look at the Priority Queue list. Notice how stations are sorted in ascending order of time so far. Click Step to see the top station pop off the queue.
-
-### Activity 4: Interchange Transfer Cost
-
-- **Trip:** Pick Vadapalani as From and Guindy as To.
-- **Action:** Click Find Route.
-- **What to notice:** Notice that the path passes through Alandur. Watch the directions show a line change from Green Line to Blue Line. The 5-minute transfer cost is paid at Alandur.
-
-### Activity 5: Connector Links in Action
-
-- **Trip:** Pick Government Estate as From and Chepauk as To.
-- **Action:** Click Find Route.
-- **What to notice:** Notice the thin dashed line between the two stations. The algorithm chooses the 15-minute walking connector rather than riding all the way around the network through Central.
+### Activity 5: Watching the Priority Queue
+- **Trip:** Pick Hosur as From and Rameswaram as To.
+- **Action:** Set animation speed to Slow in the Under the Hood panel. Click Find Route, then click Pause after a few steps.
+- **What to notice:** Inspect the Priority Queue list. Notice how nodes are ordered by total estimated cost. Click Step to watch the computer pop the lowest-cost candidate off the top of the heap.
 
 ---
 
 ## Disclaimer
 
-Simplified map for learning. Not official. Times are approximate and may not match real services.
+Simplified map for learning. Not official. Distances and times are approximate and do not include waiting for trains or buses.

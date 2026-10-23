@@ -1,6 +1,5 @@
 // Main entry point for Namma Route: Tamil Nadu Transit Network
-// Initializes MapRenderer, UIController, AnimationController, DemoController,
-// service worker registration, and URL parameter handling
+// Coordinates network building, rendering, UI, animation, demo, theme, and motion
 
 import { buildGraph } from './graph.js';
 import { runSelfTest } from './test.js';
@@ -9,9 +8,16 @@ import { UIController } from './ui.js';
 import { AnimationController } from './animate.js';
 import { DemoController } from './demo.js';
 import { initTheme } from './theme.js';
+import { MotionController } from './motion.js';
 
-// Build the network graph
+// Motion controller initialization & Step 1: Data loaded
+const motion = new MotionController();
+motion.init();
+motion.setLoaderProgress(35);
+
+// Step 2: Build the network graph
 export const graph = buildGraph();
+motion.setLoaderProgress(70);
 
 // Check URL parameters
 const urlParams = new URLSearchParams(window.location.search);
@@ -64,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const demo = new DemoController(graph, renderer, animator, ui);
 
   ui.setControllers(animator, demo);
+  ui.setMotionController(motion);
 
   if (paramMode && paramMode !== 'any') {
     ui.travelMode = paramMode;
@@ -73,16 +80,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Check URL parameters for trip or demo mode
-  if (paramFrom && paramTo && graph.cities[paramFrom] && graph.cities[paramTo]) {
-    ui.setStation('from', paramFrom);
-    ui.setStation('to', paramTo);
-    animator.start(paramFrom, paramTo, 'dijkstra', paramMode);
-  } else if (isDemoMode) {
-    demo.start();
-  } else {
-    // Default initial trip: Kanyakumari to Chennai
-    ui.setStation('from', 'kanyakumari');
-    ui.setStation('to', 'chennai');
-  }
+  // Step 3: Map drawn and DOM ready -> complete loader and trigger entrance sequence
+  motion.finishLoader(() => {
+    if (paramFrom && paramTo && graph.cities[paramFrom] && graph.cities[paramTo]) {
+      ui.setStation('from', paramFrom);
+      ui.setStation('to', paramTo);
+      animator.start(paramFrom, paramTo, 'dijkstra', paramMode);
+    } else if (isDemoMode) {
+      demo.start();
+    } else {
+      // Default initial trip: Kanyakumari to Chennai
+      ui.setStation('from', 'kanyakumari');
+      ui.setStation('to', 'chennai');
+    }
+  });
 });

@@ -1,9 +1,10 @@
 // Simple Service Worker for Namma Route offline caching
-const CACHE_NAME = 'namma-route-v1';
+const CACHE_NAME = 'namma-route-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './styles.css',
+  './css/motion.css',
   './manifest.json',
   './assets/favicon.png',
   './assets/logo.png',
@@ -18,6 +19,7 @@ const ASSETS_TO_CACHE = [
   './js/demo.js',
   './js/test.js',
   './js/theme.js',
+  './js/motion.js',
   './js/main.js'
 ];
 

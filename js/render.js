@@ -243,6 +243,8 @@ export class MapRenderer {
   }
 
   setSelection(fromId, toId) {
+    if (fromId && fromId !== this.selectedFromId) this.pulseCity(fromId);
+    if (toId && toId !== this.selectedToId) this.pulseCity(toId);
     this.selectedFromId = fromId;
     this.selectedToId = toId;
     for (const [id, g] of Object.entries(this.cityElements)) {
@@ -253,13 +255,32 @@ export class MapRenderer {
     this.updateLabelVisibility();
   }
 
+  pulseCity(cityId) {
+    const c = this.graph.cities[cityId];
+    if (!c) return;
+    const pulse = this.createSvgEl('circle', {
+      cx: c.x,
+      cy: c.y,
+      r: 9,
+      class: 'city-picked-pulse-ring'
+    });
+    this.layers.search.appendChild(pulse);
+    setTimeout(() => pulse.remove(), 650);
+  }
+
   drawPins() {
     this.layers.pins.innerHTML = '';
     const addPin = (cityId, cls) => {
       const c = this.graph.cities[cityId];
       if (!c) return;
       const pin = this.createSvgEl('g', { class: `map-pin ${cls}`, transform: `translate(${c.x}, ${c.y - 12})` });
-      pin.innerHTML = '<circle r="7" class="pin-head" /><path d="M-4 0 L0 10 L4 0 Z" class="pin-needle" />';
+      pin.innerHTML = `
+        <ellipse cx="0" cy="12" rx="5" ry="2" class="pin-shadow" />
+        <g class="pin-body">
+          <circle r="7" class="pin-head" />
+          <path d="M-4 0 L0 10 L4 0 Z" class="pin-needle" />
+        </g>
+      `;
       this.layers.pins.appendChild(pin);
     };
     if (this.selectedFromId) addPin(this.selectedFromId, 'pin-start');

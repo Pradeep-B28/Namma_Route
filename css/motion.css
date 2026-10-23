@@ -1,0 +1,407 @@
+/* Motion and 3D Interaction Styles for Namma Route
+   Plain CSS hand-crafted animations with zero third-party libraries */
+
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 1. Parallax Background Layers */
+.parallax-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+  user-select: none;
+}
+
+.parallax-layer {
+  position: absolute;
+  inset: -30px;
+  will-change: transform;
+}
+
+/* Far Layer: Blurred gradient blobs */
+.parallax-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  will-change: transform;
+}
+
+.blob-1 {
+  width: 380px; height: 380px;
+  top: 10%; left: 15%;
+  background: #A7F3D0;
+  opacity: 0.35;
+  animation: blobDrift 20s infinite alternate ease-in-out;
+}
+
+.blob-2 {
+  width: 420px; height: 420px;
+  bottom: 12%; right: 10%;
+  background: #A5F3FC;
+  opacity: 0.35;
+  animation: blobDrift 24s infinite alternate-reverse ease-in-out;
+}
+
+[data-theme="dark"] .blob-1 { background: #10B981; opacity: 0.12; }
+[data-theme="dark"] .blob-2 { background: #06B6D4; opacity: 0.12; }
+
+@keyframes blobDrift {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(30px, -24px) scale(1.08); }
+  100% { transform: translate(-20px, 20px) scale(0.94); }
+}
+
+/* Middle Layer: Faint dot grid */
+.parallax-grid {
+  width: 100%; height: 100%;
+  background-image: radial-gradient(var(--text) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.06;
+}
+
+/* Near Layer: Curved dashed routes */
+.parallax-routes {
+  width: 100%; height: 100%;
+  stroke: var(--text);
+  stroke-opacity: 0.08;
+  stroke-width: 1.5;
+  stroke-dasharray: 6 8;
+  fill: none;
+}
+
+/* 2. Loader Overlay (Inline fallback + animation) */
+.app-loader {
+  position: fixed;
+  inset: 0;
+  background-color: var(--bg);
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  transition: opacity 400ms var(--ease), transform 400ms var(--ease);
+  animation: loaderSafetyNet 6s forwards;
+}
+
+@keyframes loaderSafetyNet {
+  0%, 90% { opacity: 1; pointer-events: auto; }
+  100% { opacity: 0; pointer-events: none; visibility: hidden; }
+}
+
+.app-loader.loader-hidden {
+  opacity: 0 !important;
+  transform: scale(1.02) !important;
+  pointer-events: none !important;
+}
+
+.loader-map-outline {
+  width: 80px; height: 106px;
+  stroke: url(#loader-gradient);
+  stroke-width: 28;
+  fill: none;
+  stroke-dasharray: 5500;
+  stroke-dashoffset: 5500;
+  animation: drawLoaderPath 900ms var(--ease-out) forwards;
+}
+
+@keyframes drawLoaderPath {
+  to { stroke-dashoffset: 0; }
+}
+
+.loader-brand { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.loader-title { font-size: 1.25rem; font-weight: 800; color: var(--text); letter-spacing: -0.01em; }
+.loader-tag { font-size: 0.72rem; font-weight: 600; color: var(--brand); }
+
+.loader-bar-track {
+  width: 160px; height: 3px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.loader-bar-fill {
+  width: 0%; height: 100%;
+  background: linear-gradient(90deg, #059669, #0D9488, #06B6D4);
+  border-radius: 999px;
+  transition: width 300ms var(--ease-out);
+}
+
+/* 3. B1 Map Entrance Lift */
+.map-section.map-entering {
+  transform: perspective(1200px) rotateX(18deg) translateY(24px) scale(0.96);
+  opacity: 0;
+}
+
+.map-section.map-entered {
+  transform: none;
+  opacity: 1;
+  transition: transform 900ms var(--ease-out), opacity 900ms var(--ease-out);
+}
+
+/* 4. Entrance Reveal (C) */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 500ms var(--ease-out), transform 500ms var(--ease-out);
+  will-change: opacity, transform;
+}
+
+[data-reveal].is-revealed {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+
+/* 5. B2 3D Card Tilt (Laptop fine pointers) */
+@media (hover: hover) and (pointer: fine) {
+  .tilt-card {
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 300ms var(--ease-out);
+    will-change: transform;
+  }
+  .tilt-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255, 255, 255, 0.08), transparent 60%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 300ms ease;
+  }
+  .tilt-card.is-tilting::after { opacity: 1; }
+}
+
+/* 6. B3 Compare Card Flip */
+.compare-flip-card {
+  perspective: 1000px;
+}
+.compare-flip-inner {
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  transform: rotateY(90deg);
+  transition: transform 500ms var(--ease-out);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.compare-flip-card.flipped .compare-flip-inner {
+  transform: rotateY(0deg);
+}
+
+/* 7. B4 Pin Drop & Squash */
+@keyframes pinDrop {
+  0% { transform: translateY(-16px); opacity: 0; }
+  60% { transform: translateY(0) scaleY(0.85); opacity: 1; }
+  80% { transform: translateY(-4px) scaleY(1.05); }
+  100% { transform: translateY(0) scaleY(1); opacity: 1; }
+}
+@keyframes pinShadowGrow {
+  0% { transform: scale(0.2); opacity: 0; }
+  100% { transform: scale(1); opacity: 0.35; }
+}
+
+.map-pin .pin-body {
+  animation: pinDrop 400ms var(--ease-out) forwards;
+  transform-origin: 0px 10px;
+}
+.map-pin .pin-shadow {
+  fill: rgba(0, 0, 0, 0.25);
+  animation: pinShadowGrow 400ms var(--ease-out) forwards;
+  transform-origin: 0px 12px;
+}
+[data-theme="dark"] .map-pin .pin-shadow {
+  fill: rgba(0, 0, 0, 0.5);
+}
+
+/* 8. Micro Interactions (D) */
+button, .primary-button, .compare-button, .ctrl-btn, .demo-trigger-btn, .swap-button, .reset-view-btn, .share-btn {
+  transition: transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out), background-color 150ms var(--ease-out);
+}
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+button:active:not(:disabled) {
+  transform: scale(0.97) !important;
+  transition-duration: 100ms !important;
+}
+button:focus-visible, input:focus-visible {
+  outline: 2px solid var(--brand) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 5px rgba(5, 150, 105, 0.40) !important;
+}
+
+/* D2 Find Route Button Sliding Gradient */
+.primary-button {
+  background-size: 200% auto;
+  background-position: left center;
+  transition: background-position 600ms var(--ease), transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out);
+}
+.primary-button:hover {
+  background-position: right center;
+}
+
+/* D3 Tap Ripple */
+.tap-ripple-effect {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--brand-soft);
+  transform: scale(0);
+  pointer-events: none;
+  animation: tapRippleAnim 450ms var(--ease-out) forwards;
+}
+@keyframes tapRippleAnim {
+  to { transform: scale(3.5); opacity: 0; }
+}
+
+/* D4 Swap Button Spin & Input Slide */
+.swap-button.is-spinning svg {
+  transform: rotate(180deg);
+  transition: transform 300ms var(--ease-out);
+}
+.input-slide-down { animation: swapSlideDown 300ms var(--ease-out); }
+.input-slide-up { animation: swapSlideUp 300ms var(--ease-out); }
+@keyframes swapSlideDown {
+  0% { transform: translateY(-8px); opacity: 0.6; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@keyframes swapSlideUp {
+  0% { transform: translateY(8px); opacity: 0.6; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+/* D5 Sliding Tabs Pill */
+.travel-tabs, .mode-tabs {
+  position: relative;
+}
+.travel-tab-btn, .mode-btn {
+  position: relative;
+  z-index: 2;
+  transition: color 200ms ease;
+}
+.tab-indicator {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  border-radius: 999px;
+  transition: transform 300ms var(--ease-out), width 300ms var(--ease-out);
+  pointer-events: none;
+  z-index: 1;
+}
+#travel-tab-indicator {
+  background: var(--brand);
+}
+#algo-tab-indicator {
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.travel-tab-btn.active {
+  background: transparent !important;
+  color: #FFFFFF !important;
+}
+.mode-btn.active {
+  background: transparent !important;
+  color: var(--brand) !important;
+}
+.mode-btn.active:not(:focus-visible) {
+  box-shadow: none !important;
+}
+
+/* D7 Dropdown Slide Down and Fade In */
+.station-dropdown {
+  transform: translateY(-8px);
+  opacity: 0;
+  transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
+  pointer-events: none;
+}
+.station-dropdown.open {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* D8 City Picked Pulse Ring */
+.city-picked-pulse-ring {
+  stroke: var(--brand);
+  stroke-width: 2.5;
+  fill: none;
+  animation: cityPulseAnim 600ms var(--ease-out) forwards;
+  pointer-events: none;
+}
+@keyframes cityPulseAnim {
+  0% { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+/* D12 Speed Slider Thumb Scale */
+input[type="range"]::-webkit-slider-thumb:active {
+  transform: scale(1.15);
+  transition: transform 150ms var(--ease-out);
+}
+input[type="range"]::-moz-range-thumb:active {
+  transform: scale(1.15);
+  transition: transform 150ms var(--ease-out);
+}
+
+/* Demo Cursor Tap Wave */
+.demo-cursor {
+  pointer-events: none;
+  transition: transform 300ms var(--ease-out);
+}
+.demo-cursor.cursor-tap .cursor-wave {
+  animation: cursorTapWave 550ms var(--ease-out) forwards;
+  transform-origin: 0px 0px;
+}
+@keyframes cursorTapWave {
+  0% { transform: scale(0.5); opacity: 0.9; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* 9. Reduced Motion Overrides */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .app-loader {
+    animation: none !important;
+    transition: opacity 150ms ease !important;
+  }
+  .loader-map-outline {
+    stroke-dashoffset: 0 !important;
+    animation: none !important;
+  }
+  .parallax-layer, .parallax-blob {
+    animation: none !important;
+    transform: none !important;
+  }
+  .tilt-card {
+    transform: none !important;
+  }
+  .tilt-card::after {
+    display: none !important;
+  }
+  .map-section.map-entering {
+    transform: none !important;
+    opacity: 1 !important;
+  }
+  [data-reveal] {
+    transform: none !important;
+    transition: opacity 150ms ease !important;
+  }
+  /* Keep algorithm search and route animations running as they are the content */
+  .search-ripple, .route-outer-glow, .route-inner-core, .pulse-ring, .city-picked-pulse-ring {
+    animation-duration: 0.65s !important;
+    transition-duration: 0.65s !important;
+  }
+}

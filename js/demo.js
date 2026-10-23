@@ -1,6 +1,6 @@
 // Demo Mode Controller for Namma Route
-// Auto-plays and loops a showcase trip for recording reels
-// Shows visible tap animations, runs Compare mode, holds result for 3s, and loops
+// Auto-plays and loops the iconic showcase trip for recording reels
+// Sequence: loader (first loop only), entrance reveal, pick From with tap animation, pick To, run Compare, hold 3s, loop
 
 export class DemoController {
   constructor(graph, renderer, animator, ui) {
@@ -12,8 +12,8 @@ export class DemoController {
     this.isActive = false;
     this.timeoutId = null;
 
-    // Best demo trip chosen from Section 10:
-    // Kanyakumari to Chennai (Dijkstra 49 vs A* 16, 67% reduction)
+    // Chosen iconic demo trip from Section 10:
+    // Kanyakumari to Chennai, Any mode (Dijkstra 49 vs A* 16, 67% less work, 33 city gap)
     this.demoStartId = 'kanyakumari';
     this.demoTargetId = 'chennai';
 
@@ -21,18 +21,17 @@ export class DemoController {
   }
 
   initCursor() {
-    // Add demo cursor element to map SVG
-    const svg = this.renderer.svg;
-    if (!svg) return;
+    const parent = this.renderer.svg;
+    if (!parent) return;
 
     this.cursor = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     this.cursor.setAttribute('id', 'demo-cursor');
     this.cursor.setAttribute('class', 'demo-cursor hidden');
     this.cursor.innerHTML = `
-      <circle r="18" fill="rgba(255, 176, 32, 0.35)" stroke="#FFB020" stroke-width="2.5" class="cursor-wave"></circle>
-      <circle r="6" fill="#FFFFFF"></circle>
+      <circle r="22" fill="rgba(5, 150, 105, 0.25)" stroke="#059669" stroke-width="2.5" class="cursor-wave"></circle>
+      <circle r="6" fill="#059669" stroke="#FFFFFF" stroke-width="1.5"></circle>
     `;
-    svg.appendChild(this.cursor);
+    parent.appendChild(this.cursor);
   }
 
   start() {
@@ -56,7 +55,6 @@ export class DemoController {
     const demoBanner = document.getElementById('demo-banner');
     if (demoBanner) demoBanner.classList.add('hidden');
 
-    // Remove ?demo=1 from URL without refreshing
     const url = new URL(window.location);
     url.searchParams.delete('demo');
     window.history.replaceState({}, '', url);
@@ -65,37 +63,48 @@ export class DemoController {
   async runLoop() {
     if (!this.isActive) return;
 
-    // Reset map state
+    // Reset map and selection state
     this.renderer.clearRoute();
     this.renderer.clearSearchHighlights();
     this.renderer.setSelection(null, null);
     this.ui.resetUnderTheHood();
 
-    const startStation = this.graph.stations[this.demoStartId];
-    const targetStation = this.graph.stations[this.demoTargetId];
+    // Ensure Any mode is active for demo
+    this.ui.travelMode = 'any';
+    this.renderer.setTravelMode('any');
+    document.querySelectorAll('.travel-tab-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.getAttribute('data-travel') === 'any');
+    });
+    this.ui.motion?.updateTabPill('travel-mode-tabs', 'travel-tab-indicator', '.travel-tab-btn.active');
+
+    const startCity = this.graph.cities[this.demoStartId];
+    const targetCity = this.graph.cities[this.demoTargetId];
+    if (!startCity || !targetCity) return;
 
     // Step 1: Animate tap on From city (Kanyakumari)
-    await this.animateTap(startStation.x, startStation.y, 'Kanyakumari');
+    await this.animateTap(startCity.x, startCity.y);
     if (!this.isActive) return;
     this.ui.setStation('from', this.demoStartId);
+    this.renderer.pulseCity(this.demoStartId);
 
     await this.wait(900);
     if (!this.isActive) return;
 
     // Step 2: Animate tap on To city (Chennai)
-    await this.animateTap(targetStation.x, targetStation.y, 'Chennai');
+    await this.animateTap(targetCity.x, targetCity.y);
     if (!this.isActive) return;
     this.ui.setStation('to', this.demoTargetId);
+    this.renderer.pulseCity(this.demoTargetId);
 
     await this.wait(900);
     if (!this.isActive) return;
 
-    // Hide cursor during algorithm run
-    this.cursor.classList.add('hidden');
+    // Hide cursor during algorithm comparison
+    if (this.cursor) this.cursor.classList.add('hidden');
 
-    // Step 3: Run Compare Mode
+    // Step 3: Run Compare Mode in Any mode
     await new Promise((resolve) => {
-      this.animator.runCompare(this.demoStartId, this.demoTargetId, () => {
+      this.animator.runCompare(this.demoStartId, this.demoTargetId, 'any', () => {
         resolve();
       });
     });
@@ -110,16 +119,17 @@ export class DemoController {
     this.runLoop();
   }
 
-  animateTap(x, y, label) {
+  animateTap(x, y) {
     return new Promise((resolve) => {
+      if (!this.cursor) { resolve(); return; }
       this.cursor.classList.remove('hidden');
       this.cursor.setAttribute('transform', `translate(${x}, ${y})`);
       this.cursor.classList.add('cursor-tap');
 
       setTimeout(() => {
-        this.cursor.classList.remove('cursor-tap');
+        if (this.cursor) this.cursor.classList.remove('cursor-tap');
         resolve();
-      }, 500);
+      }, 550);
     });
   }
 

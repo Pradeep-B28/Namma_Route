@@ -35,6 +35,10 @@ export class UIController {
     this.demo = demo;
   }
 
+  setMotionController(motion) {
+    this.motion = motion;
+  }
+
   initElements() {
     this.fromInput = document.getElementById('from-input');
     this.fromDropdown = document.getElementById('from-dropdown');
@@ -69,6 +73,7 @@ export class UIController {
         tab.classList.add('active');
         this.travelMode = tab.getAttribute('data-travel');
         this.renderer.setTravelMode(this.travelMode);
+        this.motion?.updateTabPill('travel-mode-tabs', 'travel-tab-indicator', '.travel-tab-btn.active');
 
         if (this.travelMode === 'train') {
           if (this.fromCityId && !this.graph.cities[this.fromCityId]?.rail) {
@@ -168,6 +173,15 @@ export class UIController {
 
   setupSwapButton() {
     this.swapBtn.addEventListener('click', () => {
+      this.swapBtn.classList.add('is-spinning');
+      this.fromInput.classList.add('input-slide-down');
+      this.toInput.classList.add('input-slide-up');
+      setTimeout(() => {
+        this.swapBtn.classList.remove('is-spinning');
+        this.fromInput.classList.remove('input-slide-down');
+        this.toInput.classList.remove('input-slide-up');
+      }, 300);
+
       const prevFrom = this.fromCityId, prevTo = this.toCityId;
       this.fromCityId = prevTo; this.toCityId = prevFrom;
       this.fromInput.value = this.fromCityId ? this.graph.cities[this.fromCityId].name : '';
@@ -183,6 +197,7 @@ export class UIController {
         buttons.forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
         this.currentAlgorithm = btn.getAttribute('data-mode');
+        this.motion?.updateTabPill('algo-mode-tabs', 'algo-tab-indicator', '.mode-btn.active');
       });
     });
   }
@@ -306,15 +321,11 @@ export class UIController {
     const switchesWord = result.switches === 1 ? 'switch' : 'switches';
     const stepsHtml = result.stepsText.map((s) => `<li class="step-item">${s}</li>`).join('');
 
-    const hours = Math.floor(result.totalTime / 60);
-    const mins = Math.round(result.totalTime % 60);
-    const timeText = hours === 0 ? `about ${mins} min` : (mins === 0 ? `about ${hours} h` : `about ${hours} h ${mins} min`);
-
     this.resultCard.innerHTML = `
       <div class="result-header">
         <div class="result-time-block">
           <span class="time-label">Fastest Route (${this.travelMode.toUpperCase()})</span>
-          <span class="time-value">${timeText}</span>
+          <span class="time-value" id="result-time-val">about 0 min</span>
         </div>
         <div class="result-meta-block">
           <span class="meta-pill">${result.totalKm} km</span>
@@ -329,6 +340,8 @@ export class UIController {
       </div>
     `;
     this.resultCard.classList.remove('hidden');
+    this.animateTime('result-time-val', result.totalTime, 600);
+    this.motion?.revealResultCard(this.resultCard);
 
     const shareBtn = document.getElementById('btn-share-route');
     shareBtn?.addEventListener('click', () => this.shareRoute(shareBtn));
@@ -344,16 +357,20 @@ export class UIController {
       <div class="compare-card">
         <h3 class="compare-title">Comparison Results</h3>
         <div class="compare-metrics-row">
-          <div class="metric-box dijkstra-box">
-            <span class="metric-name">Dijkstra</span>
-            <span class="metric-number" id="count-dijkstra">0</span>
-            <span class="metric-sub">cities checked</span>
+          <div class="metric-box dijkstra-box tilt-card compare-flip-card" id="flip-dijkstra">
+            <div class="compare-flip-inner">
+              <span class="metric-name">Dijkstra</span>
+              <span class="metric-number" id="count-dijkstra">0</span>
+              <span class="metric-sub">cities checked</span>
+            </div>
           </div>
           <div class="metric-vs">vs</div>
-          <div class="metric-box astar-box">
-            <span class="metric-name">A* Search</span>
-            <span class="metric-number" id="count-astar">0</span>
-            <span class="metric-sub">cities checked</span>
+          <div class="metric-box astar-box tilt-card compare-flip-card" id="flip-astar">
+            <div class="compare-flip-inner">
+              <span class="metric-name">A* Search</span>
+              <span class="metric-number" id="count-astar">0</span>
+              <span class="metric-sub">cities checked</span>
+            </div>
           </div>
         </div>
         <div class="compare-headline">
@@ -364,11 +381,41 @@ export class UIController {
     `;
     this.resultCard.classList.remove('hidden');
 
-    this.animateNumber('count-dijkstra', dCities, 700);
-    this.animateNumber('count-astar', aCities, 700);
+    const flipD = document.getElementById('flip-dijkstra');
+    const flipA = document.getElementById('flip-astar');
+    requestAnimationFrame(() => {
+      flipD?.classList.add('flipped');
+      setTimeout(() => flipA?.classList.add('flipped'), 120);
+    });
+
+    setTimeout(() => {
+      this.animateNumber('count-dijkstra', dCities, 600);
+      this.animateNumber('count-astar', aCities, 600);
+    }, 200);
+
+    this.motion?.revealResultCard(this.resultCard);
 
     const shareBtn = document.getElementById('btn-share-compare');
     shareBtn?.addEventListener('click', () => this.shareRoute(shareBtn));
+  }
+
+  animateTime(id, targetMinutes, duration = 600) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const formatTime = (mins) => {
+      const h = Math.floor(mins / 60);
+      const m = Math.round(mins % 60);
+      if (h === 0) return `about ${m} min`;
+      if (m === 0) return `about ${h} h`;
+      return `about ${h} h ${m} min`;
+    };
+    const start = performance.now();
+    const tick = (now) => {
+      const p = Math.min((now - start) / duration, 1);
+      el.textContent = formatTime(Math.round(p * targetMinutes));
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   }
 
   animateNumber(id, target, duration = 600) {
