@@ -19,7 +19,7 @@ No emojis. No em dashes.
 | 0:13 - 0:15 | Map clears. A* starts. Amber ripples target directly north toward the goal. | A* Algorithm: Uses straight-line distance to guide search. | Now watch A-star. It uses a sense of direction. |
 | 0:15 - 0:21 | A* reaches destination in only 24 station checks. Glowing golden route draws itself along the metro line. | A* checked only 24 stations. Route lights up in 30 minutes. | It heads straight for the destination, checking only 24 stations. |
 | 0:21 - 0:27 | Comparison card pops up with animated count-up numbers: 56 vs 24. | Same 30 min route. 57% less work. | Exact same route and time, but 57% less computer work. |
-| 0:27 - 0:30 | Call to action card with logo and link. | Learn Data Structures and Algorithms with Wrench Wise. Try it live at namma-route.vercel.app | Master algorithms visually with Wrench Wise. |
+| 0:27 - 0:30 | Call to action card with logo and link. | Learn Data Structures and Algorithms with Wrench Wise. Try it live at nammaroute-sigma.vercel.app | Master algorithms visually with Wrench Wise. |
 
 ---
 
@@ -37,7 +37,7 @@ No emojis. No em dashes.
 | 0:23 - 0:35 | A* search runs. Focused golden ripples head directly north along the Blue Line corridor. Counter stops at 24. | A* algorithm: Guided by straight-line distance estimate. Checked only 24 stations. | This is A-star. At every station, it estimates straight-line distance to the goal. It refuses to explore backward stations, checking only 24 stations. |
 | 0:35 - 0:43 | Golden glowing route draws itself smoothly along the line from start to end with white core stroke. | Optimal route found: 30 minutes, 15 stops. | Both algorithms find the exact same 30-minute fastest route. |
 | 0:43 - 0:53 | Compare card animates numbers side by side. 56 vs 24. Work reduction counter shows 57% less work. | Dijkstra: 56 stations checked. A*: 24 stations checked. 57% less computational work. | But A-star checked 32 fewer stations. That is 57% less work for the exact same result. This is why modern map services use heuristic search. |
-| 0:53 - 1:00 | Under the Hood drawer opens briefly, showing min-heap and Big-O table. Closing card with Wrench Wise branding. | Build real CS intuition. Namma Route by Wrench Wise. Try it at namma-route.vercel.app | Understand computer science from first principles with Wrench Wise. Try it live today. |
+| 0:53 - 1:00 | Under the Hood drawer opens briefly, showing min-heap and Big-O table. Closing card with Wrench Wise branding. | Build real CS intuition. Namma Route by Wrench Wise. Try it at nammaroute-sigma.vercel.app | Understand computer science from first principles with Wrench Wise. Try it live today. |
 
 ---
 

@@ -8,7 +8,7 @@ A live compare mode runs Dijkstra and A* side by side on the same journey to dem
 
 Built by Wrench Wise.
 
-Live demo: https://namma-route.vercel.app (or your deployed Vercel URL)
+Live demo: https://nammaroute-sigma.vercel.app/
 
 ---
 
