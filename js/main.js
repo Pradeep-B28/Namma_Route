@@ -8,6 +8,7 @@ import { MapRenderer } from './render.js';
 import { UIController } from './ui.js';
 import { AnimationController } from './animate.js';
 import { DemoController } from './demo.js';
+import { initTheme } from './theme.js';
 
 // Build the network graph
 export const graph = buildGraph();
@@ -56,6 +57,7 @@ if ('serviceWorker' in navigator && window.location.protocol.startsWith('http'))
 
 // Initialize components when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
   const renderer = new MapRenderer('map-container', graph);
   const ui = new UIController(graph, renderer);
   const animator = new AnimationController(graph, renderer, ui);

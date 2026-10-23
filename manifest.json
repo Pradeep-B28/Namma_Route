@@ -1,11 +1,11 @@
 {
   "name": "Namma Route",
   "short_name": "Namma Route",
-  "description": "Chennai Metro and MRTS route finder with algorithm visualizer",
+  "description": "Tamil Nadu transit route finder with algorithm visualizer",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#0B0F17",
-  "theme_color": "#141A26",
+  "background_color": "#FFFFFF",
+  "theme_color": "#059669",
   "icons": [
     {
       "src": "assets/favicon.png",

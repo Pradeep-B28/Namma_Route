@@ -77,14 +77,43 @@ body {
   padding: 0 16px; flex-shrink: 0; z-index: 10;
 }
 .brand { display: flex; align-items: center; gap: 10px; }
+.logo-chip { display: flex; align-items: center; }
+[data-theme="dark"] .logo-chip {
+  background: #FFFFFF;
+  border-radius: 8px;
+  padding: 4px 8px;
+  display: inline-flex;
+  align-items: center;
+}
 .brand-logo { height: 28px; width: auto; object-fit: contain; }
 .brand-text-col { display: flex; flex-direction: column; }
 .brand-title-row { display: flex; align-items: baseline; gap: 8px; }
 .logo-title { font-size: 1.15rem; font-weight: 800; color: var(--text); letter-spacing: -0.01em; }
 .brand-tag { font-size: 0.72rem; color: var(--brand); font-weight: 600; }
 .brand-tagline { font-size: 0.68rem; color: var(--muted); }
-.header-actions { display: flex; align-items: center; gap: 10px; }
+.header-actions { display: flex; align-items: center; gap: 8px; }
 .header-accent-bar { height: 3px; background: linear-gradient(90deg, #059669, #0D9488, #06B6D4); width: 100%; flex-shrink: 0; }
+
+.theme-toggle-btn {
+  width: 32px; height: 32px; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--text); position: relative; overflow: hidden;
+  transition: all 0.2s;
+}
+.theme-toggle-btn:hover { border-color: var(--brand); color: var(--brand); }
+.theme-icon { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s; }
+.sun-icon { transform: rotate(0) scale(1); opacity: 1; }
+.moon-icon { position: absolute; transform: rotate(90deg) scale(0); opacity: 0; }
+[data-theme="dark"] .sun-icon { transform: rotate(-90deg) scale(0); opacity: 0; position: absolute; }
+[data-theme="dark"] .moon-icon { transform: rotate(0) scale(1); opacity: 1; position: static; }
+
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease, fill 200ms ease, stroke 200ms ease !important;
+}
 
 .demo-trigger-btn {
   height: 30px; padding: 0 12px; background: var(--brand-soft);

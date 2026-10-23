@@ -17,6 +17,7 @@ const ASSETS_TO_CACHE = [
   './js/ui.js',
   './js/demo.js',
   './js/test.js',
+  './js/theme.js',
   './js/main.js'
 ];
 
